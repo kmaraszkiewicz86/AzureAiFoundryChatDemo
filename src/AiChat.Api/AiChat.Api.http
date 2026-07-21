@@ -1,0 +1,11 @@
+@apiHttpHost = http://localhost:5288
+@apiHttpsHost = https://localhost:7222
+
+###
+# Test AI chat API endpoint
+POST {{apiHttpsHost}}/api/chat
+Content-Type: application/json
+
+{
+  "question": "Ile kosztuje Farming Simulator 25?"
+}

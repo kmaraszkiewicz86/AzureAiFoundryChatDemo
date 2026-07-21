@@ -1,0 +1,13 @@
+main {
+  max-width: 800px;
+  margin: 2rem auto;
+  font-family: Arial, sans-serif;
+}
+
+textarea {
+  width: 100%;
+}
+
+button {
+  margin-top: 0.5rem;
+}
