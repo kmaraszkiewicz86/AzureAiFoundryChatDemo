@@ -2,6 +2,6 @@
 {
     public interface IAIChatService
     {
-        Task<AskQuestionResponse> AskAsync(string question, CancellationToken cancellationToken = default);
+        Task<AskQuestionResponse[]> AskQuestionsAsync(string question, CancellationToken cancellationToken = default);
     }
 }

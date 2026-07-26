@@ -12,7 +12,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
-builder.Services.Configure<AzureOpenAIOptions>(builder.Configuration.GetSection("AzureOpenAIOptions"));
+builder.Services.Configure<AzureOpenAIOptions>(builder.Configuration.GetSection("AzureOpenAI"));
 builder.Services.AddSingleton<IAIChatService, AIChatService>();
 
 var app = builder.Build();

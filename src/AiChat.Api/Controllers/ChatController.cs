@@ -11,14 +11,14 @@ namespace AiChat.Api.Controllers;
 public sealed class AIChatController(IAIChatService aiChatService) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<AskQuestionResponse>> AskAsync([FromBody] AskQuestionRequest request, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<AskQuestionResponse[]>> AskAsync([FromBody] AskQuestionRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Question))
         {
             return BadRequest("Question is required.");
         }
 
-        var response = await aiChatService.AskAsync(request.Question, cancellationToken);
+        var response = await aiChatService.AskQuestionsAsync(request.Question, cancellationToken);
         return Ok(response);
     }
 }
