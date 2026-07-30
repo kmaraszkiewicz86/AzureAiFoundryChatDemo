@@ -53,18 +53,13 @@ function Chat() {
       {error && <p>{error}</p>}
 
       {responses && responses.length > 0 && responses.map((response) => (
-        <article key={response.source.fileName}>
+        <article key={response.LLModelName}>
+          <strong>Model:</strong> <u>{response.LLModelName}</u>
           <p>
             <strong>Question:</strong> {submittedQuestion}
           </p>
           <p>
             <strong>Answer:</strong> {response.answer}
-          </p>
-          <p>
-            <strong>Source file:</strong> {response.source.fileName}
-          </p>
-          <p>
-            <strong>Page number:</strong> {response.source.page}
           </p>
         </article>
       ))}
