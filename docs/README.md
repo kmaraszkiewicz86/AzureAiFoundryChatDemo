@@ -1,67 +1,36 @@
-# Technical Article Outline
 
-## 1. Introduction
-- Explain the goal of the demo
-- Describe why streaming matters for chat experiences
-- Set expectations for the article
+Wejdź na konto Azure 
+https://portal.azure.com/
+Zaloguj się albo stwórz konto jeżeli go nie masz. W głónym katalogu kliknij przycisk Create
 
-## 2. What We Are Building
-- ASP.NET Core backend
-- React frontend
-- Azure AI Foundry streaming
-- In-memory conversations
+<img width="536" height="340" alt="image" src="https://github.com/user-attachments/assets/302958eb-c5ae-4737-b168-50c206a05698" />
 
-## 3. Solution Structure
-- `src/AiChat.Api`
-- `src/ai-chat-react`
-- `docs/README.md`
-- Root `README.md`
+Potem w polu wyszukiwania wpisz AI foundry
 
-## 4. Backend Setup
-- Target framework and project type
-- Controller-based API
-- Dependency Injection
-- Options Pattern
-- Launch settings on `http://localhost:5000`
+<img width="640" height="290" alt="image" src="https://github.com/user-attachments/assets/35f0074d-8c55-4ce0-98ca-b44e5be3074d" />
 
-## 5. Backend Data Flow
-- `POST /api/chat` creates a conversation
-- `GET /api/chat/{chatId}/stream` streams tokens with SSE
-- Conversation storage in memory
-- Cleanup and completion behavior
+Wybierze AI foundry Microsoft Foundry od Microsoft
 
-## 6. Azure AI Foundry Integration
-- Configuration values in `appsettings.json`
-- Deployment name for GPT-5.5
-- Streaming request format
-- Handling the no-configuration fallback for local development
+<img width="1359" height="775" alt="image" src="https://github.com/user-attachments/assets/9f454e9f-78df-4cca-9c17-5b95144b37b0" />
 
-## 7. Frontend Architecture
-- React + TypeScript with Vite
-- Axios service for chat creation
-- Custom hook for state and streaming
-- Small focused components
+Stwórz lub wybierz Resource Group:
 
-## 8. UI Walkthrough
-- Question textbox
-- Ask button
-- Loading indicator
-- Streaming answer area
+<img width="718" height="693" alt="image" src="https://github.com/user-attachments/assets/3e63ced0-bf38-449c-b073-ef78303aed87" />
 
-## 9. End-to-End Request Flow
-- User enters a question
-- Frontend creates a chat
-- Backend returns a chat ID
-- Frontend opens the SSE stream
-- Answer renders progressively
+Wypełnij Name, oraz nazwe projektu
 
-## 10. Running the Sample
-- Install prerequisites
-- Configure Azure AI Foundry
-- Run the API
-- Run the frontend
-- Verify the stream
+<img width="942" height="948" alt="image" src="https://github.com/user-attachments/assets/ee3a0efb-4db5-4a97-b4e5-4cd243c53af4" />
 
-## 11. Conclusion
-- Recap the key ideas
-- Explain how to extend the sample in a future article
+Kliknij przycisk 'Review + create' nastepnie Create
+
+Teraz aby przejść do Azure AI Foundy -> odszukaj zasób Azure: 
+
+<img width="1376" height="442" alt="image" src="https://github.com/user-attachments/assets/a9c95e8f-30a6-4484-b32c-da9701463929" />
+
+W następnym oknie kliknij przycisk Go to Foundry portal
+
+<img width="1395" height="729" alt="image" src="https://github.com/user-attachments/assets/b2ea9326-e8ab-4a02-a8c5-6b459cbcce28" />
+
+Przejdź do wybierania i tworzenia modelu, kliknij 'Explore models'
+
+<img width="1496" height="815" alt="image" src="https://github.com/user-attachments/assets/642bd1d7-358a-411e-a7c7-168596bb421f" />

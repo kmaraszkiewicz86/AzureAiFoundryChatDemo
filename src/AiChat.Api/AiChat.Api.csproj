@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
 	<TargetFramework>net10.0</TargetFramework>
 	<Nullable>enable</Nullable>
 	<ImplicitUsings>enable</ImplicitUsings>
 	<AssemblyName>AiChat.Api</AssemblyName>
 	<RootNamespace>AiChat.Api</RootNamespace>
+    <UserSecretsId>a6cadcd4-f930-42d4-bb1c-45961c362971</UserSecretsId>
   </PropertyGroup>
 
 

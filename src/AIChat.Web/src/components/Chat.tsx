@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { askQuestion } from '../services/chatService'
+import { sanitizeAnswerHtml } from '../services/htmlSanitizer'
 import type { AskQuestionResponse } from '../models/askQuestionResponse'
 
 function Chat() {
   const [question, setQuestion] = useState('')
   const [submittedQuestion, setSubmittedQuestion] = useState('')
-  const [response, setResponse] = useState<AskQuestionResponse | null>(null)
+  const [responses, setResponses] = useState<AskQuestionResponse[] | null>(null)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -23,11 +24,11 @@ function Chat() {
     try {
       const result = await askQuestion(question)
       setSubmittedQuestion(question)
-      setResponse(result)
+      setResponses(result)
       setQuestion('')
     } catch {
       setError('Failed to get an answer.')
-      setResponse(null)
+      setResponses(null)
     } finally {
       setIsLoading(false)
     }
@@ -52,22 +53,24 @@ function Chat() {
 
       {error && <p>{error}</p>}
 
-      {response && (
-        <article>
+      {responses && responses.length > 0 && responses.map((response) => (
+        <article key={response.LLModelName}>
+          <strong>Model:</strong> <u>{response.LLModelName}</u>
           <p>
             <strong>Question:</strong> {submittedQuestion}
           </p>
-          <p>
-            <strong>Answer:</strong> {response.answer}
-          </p>
-          <p>
-            <strong>Source file:</strong> {response.source.fileName}
-          </p>
-          <p>
-            <strong>Page number:</strong> {response.source.page}
-          </p>
+          <div>
+            <p>
+              <strong>Answer:</strong>
+            </p>
+            <div
+              dangerouslySetInnerHTML={{
+                __html: sanitizeAnswerHtml(response.answer),
+              }}
+            />
+          </div>
         </article>
-      )}
+      ))}
     </section>
   )
 }

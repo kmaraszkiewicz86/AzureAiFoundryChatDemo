@@ -8,11 +8,11 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", policy =>
     {
         policy.WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+            .WithHeaders("Content-Type")
+            .WithMethods("POST");
     });
 });
-builder.Services.Configure<AzureOpenAIOptions>(builder.Configuration.GetSection("AzureOpenAIOptions"));
+builder.Services.Configure<AzureOpenAIOptions>(builder.Configuration.GetSection("AzureOpenAI"));
 builder.Services.AddSingleton<IAIChatService, AIChatService>();
 
 var app = builder.Build();
