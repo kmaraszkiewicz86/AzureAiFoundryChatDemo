@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { askQuestion } from '../services/chatService'
+import { sanitizeAnswerHtml } from '../services/htmlSanitizer'
 import type { AskQuestionResponse } from '../models/askQuestionResponse'
 
 function Chat() {
@@ -58,9 +59,16 @@ function Chat() {
           <p>
             <strong>Question:</strong> {submittedQuestion}
           </p>
-          <p>
-            <strong>Answer:</strong> {response.answer}
-          </p>
+          <div>
+            <p>
+              <strong>Answer:</strong>
+            </p>
+            <div
+              dangerouslySetInnerHTML={{
+                __html: sanitizeAnswerHtml(response.answer),
+              }}
+            />
+          </div>
         </article>
       ))}
     </section>
