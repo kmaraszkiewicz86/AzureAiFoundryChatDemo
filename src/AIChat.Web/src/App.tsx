@@ -1,11 +1,12 @@
-import Chat from './components/Chat'
+import StreamingChat from './components/StreamingChat'
 import './App.css'
 
 function App() {
   return (
     <main>
       <h1>AI Chat Demo</h1>
-      <Chat />
+      {/* Render the SignalR flow while preserving Chat.tsx as the synchronous implementation. */}
+      <StreamingChat />
     </main>
   )
 }

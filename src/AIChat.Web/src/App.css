@@ -11,3 +11,25 @@ textarea {
 button {
   margin-top: 0.5rem;
 }
+
+/* Keep each model answer in its own horizontal column and allow scrolling when needed. */
+.streaming-responses {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.streaming-response {
+  flex: 1 0 0;
+  min-width: 22rem;
+  padding: 1rem;
+  border: 1px solid #d0d0d0;
+  border-radius: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+/* Generated code blocks can be wider than their model column. */
+.streaming-response pre {
+  overflow-x: auto;
+}

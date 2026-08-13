@@ -1,3 +1,5 @@
+using AiChat.Api.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using OpenAI.Responses;
 using System.ClientModel;
@@ -6,16 +8,26 @@ using System.Text;
 namespace AIChat.Api.Services;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+/// <summary>
+/// Sends synchronous and streaming requests to Azure AI Foundry deployments.
+/// </summary>
 public sealed class AIChatService : IAIChatService
 {
     private readonly ResponsesClient _client;
+    private readonly IHubContext<ChatHub> _chatHubContext;
     private readonly AzureOpenAIOptions _options;
-    private readonly AzureOpenAIOptions _azureOpenAIOptions;
 
-    public AIChatService(IOptions<AzureOpenAIOptions> azureOpenAIOptions)
+    /// <summary>
+    /// Initializes the Azure AI Foundry Responses client and SignalR event publisher.
+    /// </summary>
+    /// <param name="azureOpenAIOptions">The endpoint, API key, and deployment configuration.</param>
+    /// <param name="chatHubContext">The hub context used to publish streaming model events.</param>
+    public AIChatService(
+        IOptions<AzureOpenAIOptions> azureOpenAIOptions,
+        IHubContext<ChatHub> chatHubContext)
     {
         _options = azureOpenAIOptions.Value;
-        _azureOpenAIOptions = azureOpenAIOptions.Value;
+        _chatHubContext = chatHubContext;
 
         _client = new ResponsesClient(
             new ApiKeyCredential(_options.ApiKey),
@@ -35,12 +47,55 @@ public sealed class AIChatService : IAIChatService
     {
         List<Task<AskQuestionResponse>> askQuestionTasks = [];
 
-        foreach (string deploymentName in _azureOpenAIOptions.DeploymentNames)
+        foreach (string deploymentName in _options.DeploymentNames)
         {
             askQuestionTasks.Add(AskAsync(question, deploymentName, cancellationToken));
         }
 
         return await Task.WhenAll(askQuestionTasks);
+    }
+
+    /// <summary>
+    /// Streams responses from every configured deployment to the request's SignalR group.
+    /// </summary>
+    /// <param name="requestId">The client-generated request identifier.</param>
+    /// <param name="question">The question to ask.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that completes after all configured model streams reach a terminal state.</returns>
+    public async Task AskQuestionsStreamingAsync(
+        Guid requestId,
+        string question,
+        CancellationToken cancellationToken = default)
+    {
+        // Publish all start events first so React knows every active model before any model can complete.
+        foreach (string deploymentName in _options.DeploymentNames)
+        {
+            await _chatHubContext.Clients
+                .Group(ChatHub.GetRequestGroupName(requestId))
+                .SendAsync(
+                    "ResponseStarted",
+                    new
+                    {
+                        RequestId = requestId,
+                        LLModelName = deploymentName
+                    },
+                    cancellationToken);
+        }
+
+        List<Task> askQuestionTasks = [];
+
+        // Stream all configured deployments concurrently, matching the synchronous fan-out behavior.
+        foreach (string deploymentName in _options.DeploymentNames)
+        {
+            askQuestionTasks.Add(
+                AskStreamingAsync(
+                    requestId,
+                    question,
+                    deploymentName,
+                    cancellationToken));
+        }
+
+        await Task.WhenAll(askQuestionTasks);
     }
 
     /// <summary>
@@ -89,6 +144,100 @@ public sealed class AIChatService : IAIChatService
                 Answer = errorMessageStringBuilder.ToString(),
                 LLModelName = deploymentName
             };
+        }
+    }
+
+    /// <summary>
+    /// Streams a response from the specified deployment to the request's SignalR group.
+    /// </summary>
+    /// <param name="requestId">The client-generated request identifier.</param>
+    /// <param name="question">The question to ask.</param>
+    /// <param name="deploymentName">The name of the deployment to use.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that completes after the model reports completion or failure.</returns>
+    private async Task AskStreamingAsync(
+        Guid requestId,
+        string question,
+        string deploymentName,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            string chatPrompt = GenerateChatPrompt(question);
+
+            CreateResponseOptions request = new()
+            {
+                Model = deploymentName,
+                // The installed OpenAI Responses SDK uses this flag with CreateResponseStreamingAsync.
+                StreamingEnabled = true,
+                InputItems =
+                {
+                    ResponseItem.CreateUserMessageItem(chatPrompt)
+                }
+            };
+
+            await foreach (StreamingResponseUpdate update in _client.CreateResponseStreamingAsync(
+                request,
+                cancellationToken))
+            {
+                if (update is not StreamingResponseOutputTextDeltaUpdate textDelta
+                    || string.IsNullOrEmpty(textDelta.Delta))
+                {
+                    continue;
+                }
+
+                // Forward each text delta immediately and retain the originating deployment name.
+                await _chatHubContext.Clients
+                    .Group(ChatHub.GetRequestGroupName(requestId))
+                    .SendAsync(
+                        "ResponseChunk",
+                        new
+                        {
+                            RequestId = requestId,
+                            LLModelName = deploymentName,
+                            Chunk = textDelta.Delta
+                        },
+                        cancellationToken);
+            }
+
+            // Mark only this deployment as complete; other deployment streams may still be running.
+            await _chatHubContext.Clients
+                .Group(ChatHub.GetRequestGroupName(requestId))
+                .SendAsync(
+                    "ResponseCompleted",
+                    new
+                    {
+                        RequestId = requestId,
+                        LLModelName = deploymentName
+                    },
+                    cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Preserve host shutdown cancellation so the background worker can stop promptly.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Convert an individual model failure into a terminal SignalR event without failing sibling models.
+            StringBuilder errorMessageStringBuilder = new();
+
+            errorMessageStringBuilder.AppendLine(ex.Message);
+
+            if (ex.InnerException != null)
+                errorMessageStringBuilder.AppendLine(ex.InnerException.Message);
+
+            await _chatHubContext.Clients
+                .Group(ChatHub.GetRequestGroupName(requestId))
+                .SendAsync(
+                    "ResponseFailed",
+                    new
+                    {
+                        RequestId = requestId,
+                        LLModelName = deploymentName,
+                        Error = errorMessageStringBuilder.ToString()
+                    },
+                    cancellationToken);
         }
     }
 
