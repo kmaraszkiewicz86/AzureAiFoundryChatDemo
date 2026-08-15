@@ -1,24 +1,24 @@
 using AiChat.Api.Hubs;
+using Azure.AI.OpenAI;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
-using OpenAI.Responses;
+using OpenAI.Chat;
 using System.ClientModel;
 using System.Text;
 
 namespace AIChat.Api.Services;
 
-#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 /// <summary>
 /// Sends synchronous and streaming requests to Azure AI Foundry deployments.
 /// </summary>
 public sealed class AIChatService : IAIChatService
 {
-    private readonly ResponsesClient _client;
+    private readonly AzureOpenAIClient _client;
     private readonly IHubContext<ChatHub> _chatHubContext;
     private readonly AzureOpenAIOptions _options;
 
     /// <summary>
-    /// Initializes the Azure AI Foundry Responses client and SignalR event publisher.
+    /// Initializes the Azure AI Foundry client and SignalR event publisher.
     /// </summary>
     /// <param name="azureOpenAIOptions">The endpoint, API key, and deployment configuration.</param>
     /// <param name="chatHubContext">The hub context used to publish streaming model events.</param>
@@ -29,12 +29,9 @@ public sealed class AIChatService : IAIChatService
         _options = azureOpenAIOptions.Value;
         _chatHubContext = chatHubContext;
 
-        _client = new ResponsesClient(
-            new ApiKeyCredential(_options.ApiKey),
-            new ResponsesClientOptions
-            {
-                Endpoint = new Uri(_options.Endpoint.Replace("/responses", "/"))
-            });
+        _client = new AzureOpenAIClient(
+            new Uri(_options.Endpoint),
+            new ApiKeyCredential(_options.ApiKey));
     }
 
     /// <summary>
@@ -110,23 +107,15 @@ public sealed class AIChatService : IAIChatService
         try
         {
             string chatPrompt = GenerateChatPrompt(question);
+            ChatClient chatClient = _client.GetChatClient(deploymentName);
 
-            CreateResponseOptions request = new()
-            {
-                Model = deploymentName,
-                InputItems =
-                {
-                    ResponseItem.CreateUserMessageItem(chatPrompt)
-                }
-            };
-
-            ResponseResult response = await _client.CreateResponseAsync(
-                request,
-                cancellationToken);
+            ChatCompletion response = await chatClient.CompleteChatAsync(
+                [new UserChatMessage(chatPrompt)],
+                cancellationToken: cancellationToken);
 
             return new AskQuestionResponse
             {
-                Answer = response.GetOutputText(),
+                Answer = string.Concat(response.Content.Select(contentPart => contentPart.Text)),
                 LLModelName = deploymentName
             };
         }
@@ -164,40 +153,35 @@ public sealed class AIChatService : IAIChatService
         try
         {
             string chatPrompt = GenerateChatPrompt(question);
+            ChatClient chatClient = _client.GetChatClient(deploymentName);
+            ChatMessage[] messages = [new UserChatMessage(chatPrompt)];
 
-            CreateResponseOptions request = new()
+            AsyncCollectionResult<StreamingChatCompletionUpdate> chatResponseStreaming = chatClient.CompleteChatStreamingAsync(
+                messages,
+                cancellationToken: cancellationToken);
+
+            await foreach (StreamingChatCompletionUpdate update in chatResponseStreaming)
             {
-                Model = deploymentName,
-                // The installed OpenAI Responses SDK uses this flag with CreateResponseStreamingAsync.
-                StreamingEnabled = true,
-                InputItems =
+                foreach (ChatMessageContentPart contentPart in update.ContentUpdate)
                 {
-                    ResponseItem.CreateUserMessageItem(chatPrompt)
-                }
-            };
+                    if (string.IsNullOrEmpty(contentPart.Text))
+                    {
+                        continue;
+                    }
 
-            await foreach (StreamingResponseUpdate update in _client.CreateResponseStreamingAsync(
-                request,
-                cancellationToken))
-            {
-                if (update is not StreamingResponseOutputTextDeltaUpdate textDelta
-                    || string.IsNullOrEmpty(textDelta.Delta))
-                {
-                    continue;
+                    // Forward each text delta immediately and retain the originating deployment name.
+                    await _chatHubContext.Clients
+                        .Group(ChatHub.GetRequestGroupName(requestId))
+                        .SendAsync(
+                            "ResponseChunk",
+                            new
+                            {
+                                RequestId = requestId,
+                                LLModelName = deploymentName,
+                                Chunk = contentPart.Text
+                            },
+                            cancellationToken);
                 }
-
-                // Forward each text delta immediately and retain the originating deployment name.
-                await _chatHubContext.Clients
-                    .Group(ChatHub.GetRequestGroupName(requestId))
-                    .SendAsync(
-                        "ResponseChunk",
-                        new
-                        {
-                            RequestId = requestId,
-                            LLModelName = deploymentName,
-                            Chunk = textDelta.Delta
-                        },
-                        cancellationToken);
             }
 
             // Mark only this deployment as complete; other deployment streams may still be running.
@@ -368,5 +352,3 @@ public sealed class AIChatService : IAIChatService
             """;
     }
 }
-
-#pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
