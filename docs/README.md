@@ -1,7 +1,6 @@
 
 ## Wstęp
-Artykuł będzie przedstawiał jak można z pomocą React + SignalR + .net API stworzyć prosty projekt, zawierający logikę AI, która będzie korzystać z 
-technologii Azure AI Foundru. Dodam również 3 modele LLM 1x low 1x medium oraz 1x high aby sprawdzić koszty o raz jakość odpowiedzi na 3 oddzielne prompty.
+Artykuł będzie przedstawiał, jak można z pomocą React + SignalR + .NET API stworzyć prosty projekt, zawierający logikę AI, która będzie korzystać z technologii Azure AI Foundry. Dodam również 3 modele LLM: 1x low, 1x medium oraz 1x high, aby sprawdzić koszty oraz jakość odpowiedzi na 4 oddzielne prompty.
 1. ### Proste zadanie — podstawowe generowanie kodu: <br />
 	#### Prompt:  <br />
 	Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.
@@ -18,7 +17,7 @@ technologii Azure AI Foundru. Dodam również 3 modele LLM 1x low 1x medium oraz
 	#### Prompt:  <br />
 	Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób 		przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.
 	- #### Dlaczego ten prompt?  <br />
-		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość reasoning, znajomość 	zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku różnice pomiędzy słabszymi i mocniejszymi modelami powinny być znacznie bardziej widoczne.
+		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość reasoning, znajomość 	zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku będzie można sprawdzić, czy różnice pomiędzy słabszymi i mocniejszymi modelami są bardziej widoczne.
 
 1. ### Analiza istniejącego kodu — Code Review
 
@@ -45,13 +44,13 @@ technologii Azure AI Foundru. Dodam również 3 modele LLM 1x low 1x medium oraz
 	
 	Dzięki temu można łatwo porównać, czy różne modele wykrywają te same problemy, czy proponują minimalne i poprawne zmiany oraz jak dobrze uzasadniają swoje decyzje.
 
-W artykule wyjaśnie również logikę UI oraz API, omówie jak można stworzyć prompt, który stworze w API, zaiwerający pytanie od użytkownika.
+W artykule wyjaśnię również logikę UI oraz API, omówię, jak można stworzyć prompt w API, zawierający pytanie od użytkownika.
 
 ## Tworzenie serwisu AI Foundry na środowisku Azure
 
 Wejdź na konto Azure 
 https://portal.azure.com/
-1. Zaloguj się albo stwórz konto jeżeli go nie masz. W głónym katalogu kliknij przycisk Create
+1. Zaloguj się albo stwórz konto jeżeli go nie masz. W głównym katalogu kliknij przycisk Create.
 
 	<img width="536" height="340" alt="image" src="https://github.com/user-attachments/assets/302958eb-c5ae-4737-b168-50c206a05698" />
 
@@ -59,7 +58,7 @@ https://portal.azure.com/
 
 	<img width="640" height="290" alt="image" src="https://github.com/user-attachments/assets/35f0074d-8c55-4ce0-98ca-b44e5be3074d" />
 
-1. Wybierze AI foundry Microsoft Foundry od Microsoft
+1. Wybierz Microsoft Foundry od Microsoft.
 
 	<img width="1359" height="775" alt="image" src="https://github.com/user-attachments/assets/9f454e9f-78df-4cca-9c17-5b95144b37b0" />
 
@@ -67,13 +66,13 @@ https://portal.azure.com/
 
 	<img width="718" height="693" alt="image" src="https://github.com/user-attachments/assets/3e63ced0-bf38-449c-b073-ef78303aed87" />
 
-1. Wypełnij Name, oraz nazwe projektu
+1. Wypełnij pole Name oraz nazwę projektu.
 
 	<img width="942" height="948" alt="image" src="https://github.com/user-attachments/assets/ee3a0efb-4db5-4a97-b4e5-4cd243c53af4" />
 
-1. Kliknij przycisk 'Review + create' nastepnie Create
+1. Kliknij przycisk 'Review + create', następnie 'Create'.
 
-	Teraz aby przejść do Azure AI Foundy -> odszukaj zasób Azure: 
+	Teraz, aby przejść do Azure AI Foundry, odszukaj zasób Azure:
 
 	<img width="1376" height="442" alt="image" src="https://github.com/user-attachments/assets/a9c95e8f-30a6-4484-b32c-da9701463929" />
 
@@ -81,7 +80,7 @@ https://portal.azure.com/
 
 	<img width="1395" height="729" alt="image" src="https://github.com/user-attachments/assets/b2ea9326-e8ab-4a02-a8c5-6b459cbcce28" />
 
-1. Przejdź do wybierania i tworzenia modelu, kliknij 'Explore models'
+1. Przejdź do wyboru modelu i kliknij 'Explore models'.
 
 	<img width="1496" height="815" alt="image" src="https://github.com/user-attachments/assets/642bd1d7-358a-411e-a7c7-168596bb421f" />
 
@@ -89,11 +88,11 @@ https://portal.azure.com/
    
 	<img width="1588" height="310" alt="image" src="https://github.com/user-attachments/assets/806c3b79-527e-47ca-8e3b-86f242a01321" />
 
-1. Na następnym ekranie wybierz (Default settings lub Custom settings) w zależności czy chcesz aby model wygenrował się z domyślną nazwą oraz ustawieniami lub z ustawieniami, skonfigurowanymi 	przez Ciebie
+1. Na następnym ekranie wybierz Default settings lub Custom settings, w zależności od tego, czy chcesz użyć domyślnej nazwy i ustawień, czy skonfigurować je samodzielnie.
 
 	<img width="1401" height="277" alt="image" src="https://github.com/user-attachments/assets/00489dcb-38ce-4ec2-b873-24a6239436f9" />
 
-1. Ja wybiore Custom settings i nazwe model po swojemu. Również dla potrzeb tego artykułu stworze 3 różne modele, gdzie będę mógł zdiagnozować koszty oraz stworze 3 modele do testów:
+1. Ja wybiorę Custom settings i nazwę model po swojemu. Dla potrzeb tego artykułu stworzę 3 różne modele do testów, dzięki którym będę mógł porównać koszty oraz jakość odpowiedzi:
    		- "gpt-5.4-mini-low",
       	- "gpt-5.6-terra-medium",
       	- "gpt-5.6-sol-high"
@@ -103,6 +102,6 @@ https://portal.azure.com/
 ## Omówienie logiki po stronie API
 
 ## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i ile tokenów jest wykorzystywane przez 3 różne modele.
-Przedstawie teraz poniżej analizę jak różen LLMy radzą sobie z pytaniami i ile wygeneruje się przez to tokenów i jakie są koszty danych zapytań. Trzeba przy tym pamiętać że ilość zużytych tokenów może się różnić i to co przedstawie może róźnić się wynikami, które mogą być zaobserwowane na innych śropdowiskach
+Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami, ile tokenów wykorzystują oraz jakie są koszty poszczególnych zapytań. Trzeba przy tym pamiętać, że liczba zużytych tokenów może się różnić, dlatego przedstawione wyniki mogą być inne niż wyniki zaobserwowane na innych środowiskach.
 
 
