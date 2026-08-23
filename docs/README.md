@@ -1,4 +1,52 @@
 
+## Wstęp
+Artykuł będzie przedstawiał jak można z pomocą React + SignalR + .net API stworzyć prosty projekt, zawierający logikę AI, która będzie korzystać z 
+technologii Azure AI Foundru. Dodam również 3 modele LLM 1x low 1x medium oraz 1x high aby sprawdzić koszty o raz jakość odpowiedzi na 3 oddzielne prompty.
+1. ### Proste zadanie — podstawowe generowanie kodu: <br />
+	#### Prompt:  <br />
+	Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.
+	- #### Dlaczego ten prompt?
+		To bardzo proste zadanie, które pozwala sprawdzić podstawową jakość generowanego kodu oraz to, czy model nie komplikuje niepotrzebnie prostego problemu. Jest też dobrym punktem 	odniesienia do porównania liczby wykorzystanych tokenów, czasu odpowiedzi i kosztu pomiędzy modelami.
+
+1. ### Średnio zaawansowane zadanie — implementacja REST API:  <br />
+	#### Prompt:  <br />
+	Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych 		wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania. 
+	- #### Dlaczego ten prompt?: <br />
+		To zadanie jest bliższe rzeczywistemu zastosowaniu modelu przez programistę. Pozwala sprawdzić, czy model poprawnie rozumie strukturę aplikacji ASP.NET Core, Dependency Injection, 		programowanie asynchroniczne oraz podstawowe zasady projektowania API. Odpowiedź powinna być wyraźnie bardziej rozbudowana niż w pierwszym teście, dlatego można również porównać 			wzrost liczby tokenów i kosztu.
+
+1. ### Zaawansowane zadanie — architektura i implementacja:  <br />
+	#### Prompt:  <br />
+	Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób 		przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.
+	- #### Dlaczego ten prompt?  <br />
+		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość reasoning, znajomość 	zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku różnice pomiędzy słabszymi i mocniejszymi modelami powinny być znacznie bardziej widoczne.
+
+1. ### Analiza istniejącego kodu — Code Review
+
+	#### Prompt:
+	```text
+	Przeanalizuj poniższy kod C#. Znajdź błędy, problemy związane z async/await, obsługą wyjątków, wydajnością oraz jakością kodu. Zaproponuj tylko niezbędne poprawki bez niepotrzebnego przepisywania całej implementacji. Wyjaśnij każdą zaproponowaną zmianę.
+	
+	public async Task<Product?> GetProductAsync(int id)
+	{
+	    var product = _repository.GetById(id);
+	
+	    if (product == null)
+	    {
+	        throw new Exception("Product not found");
+	    }
+	
+	    return await Task.FromResult(product);
+	}
+	```
+	
+	#### Dlaczego ten prompt?
+	
+	To zadanie pozwala sprawdzić, czy model potrafi analizować istniejący kod zamiast generować rozwiązanie od zera. Kod zawiera kilka celowych problemów, między innymi niepoprawne użycie async/await, zbędne `Task.FromResult`, zbyt ogólny wyjątek oraz potencjalnie synchroniczne wywołanie repozytorium.
+	
+	Dzięki temu można łatwo porównać, czy różne modele wykrywają te same problemy, czy proponują minimalne i poprawne zmiany oraz jak dobrze uzasadniają swoje decyzje.
+
+W artykule wyjaśnie również logikę UI oraz API, omówie jak można stworzyć prompt, który stworze w API, zaiwerający pytanie od użytkownika.
+
 ## Tworzenie serwisu AI Foundry na środowisku Azure
 
 Wejdź na konto Azure 
@@ -38,5 +86,23 @@ https://portal.azure.com/
 	<img width="1496" height="815" alt="image" src="https://github.com/user-attachments/assets/642bd1d7-358a-411e-a7c7-168596bb421f" />
 
 1. Z listy wybierz model np. gpt-5.6-sol
+   
+	<img width="1588" height="310" alt="image" src="https://github.com/user-attachments/assets/806c3b79-527e-47ca-8e3b-86f242a01321" />
+
+1. Na następnym ekranie wybierz (Default settings lub Custom settings) w zależności czy chcesz aby model wygenrował się z domyślną nazwą oraz ustawieniami lub z ustawieniami, skonfigurowanymi 	przez Ciebie
+
+	<img width="1401" height="277" alt="image" src="https://github.com/user-attachments/assets/00489dcb-38ce-4ec2-b873-24a6239436f9" />
+
+1. Ja wybiore Custom settings i nazwe model po swojemu. Również dla potrzeb tego artykułu stworze 3 różne modele, gdzie będę mógł zdiagnozować koszty oraz stworze 3 modele do testów:
+   		- "gpt-5.4-mini-low",
+      	- "gpt-5.6-terra-medium",
+      	- "gpt-5.6-sol-high"
+   
+## Omówienie logiki po stronie UI
+
+## Omówienie logiki po stronie API
+
+## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i ile tokenów jest wykorzystywane przez 3 różne modele.
+Przedstawie teraz poniżej analizę jak różen LLMy radzą sobie z pytaniami i ile wygeneruje się przez to tokenów i jakie są koszty danych zapytań. Trzeba przy tym pamiętać że ilość zużytych tokenów może się różnić i to co przedstawie może róźnić się wynikami, które mogą być zaobserwowane na innych śropdowiskach
 
 
