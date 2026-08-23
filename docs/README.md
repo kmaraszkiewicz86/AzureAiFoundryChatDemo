@@ -110,6 +110,10 @@ https://portal.azure.com/
 	- [Microsoft Azure OpenAI pricing](https://azure.microsoft.com/en-us/pricing/details/azure-openai/)
 	
 	> **Uwaga:** Ceny zostały sprawdzone podczas tworzenia artykułu i dotyczą wariantu Global Standard. Cennik Microsoft Azure może ulec zmianie, dlatego przed wykonaniem własnych testów warto sprawdzić aktualne ceny na oficjalnej stronie Azure.
+
+Ostatecznie moja lista deployment'u, jest pokazana na poniższym screen'ie:
+	<img width="1594" height="312" alt="image" src="https://github.com/user-attachments/assets/a61084b1-5e75-43ce-9912-b14233580b6d" />
+
    
 ## Omówienie logiki po stronie UI
 
