@@ -93,9 +93,23 @@ https://portal.azure.com/
 	<img width="1401" height="277" alt="image" src="https://github.com/user-attachments/assets/00489dcb-38ce-4ec2-b873-24a6239436f9" />
 
 1. Ja wybiorę Custom settings i nazwę model po swojemu. Dla potrzeb tego artykułu stworzę 3 różne modele do testów, dzięki którym będę mógł porównać koszty oraz jakość odpowiedzi:
-   		- "gpt-5.4-mini-low",
-      	- "gpt-5.6-terra-medium",
-      	- "gpt-5.6-sol-high"
+	- **"gpt-5.4-mini-low"** – użyty będzie model `gpt-5.4-mini`.  
+	  Cena Global Standard za 1 mln tokenów: **€0.66 input / €3.96 output**.  
+	  Jest około **2.67x tańszy od gpt-5.6-terra** oraz około **6.67x tańszy od gpt-5.6-sol**.
+	
+	- **"gpt-5.6-terra-medium"** – użyty będzie model `gpt-5.6-terra`.  
+	  Cena Global Standard za 1 mln tokenów: **€1.76 input / €10.55 output**.  
+	  Jest około **2.67x droższy od gpt-5.4-mini** oraz około **2.5x tańszy od gpt-5.6-sol**.
+	
+	- **"gpt-5.6-sol-high"** – użyty będzie model `gpt-5.6-sol`.  
+	  Cena Global Standard za 1 mln tokenów: **€4.40 input / €26.36 output**.  
+	  Jest około **6.67x droższy od gpt-5.4-mini** oraz około **2.5x droższy od gpt-5.6-terra**.
+
+	### Źródła
+	
+	- [Microsoft Azure OpenAI pricing](https://azure.microsoft.com/en-us/pricing/details/azure-openai/)
+	
+	> **Uwaga:** Ceny zostały sprawdzone podczas tworzenia artykułu i dotyczą wariantu Global Standard. Cennik Microsoft Azure może ulec zmianie, dlatego przed wykonaniem własnych testów warto sprawdzić aktualne ceny na oficjalnej stronie Azure.
    
 ## Omówienie logiki po stronie UI
 
@@ -104,4 +118,25 @@ https://portal.azure.com/
 ## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i ile tokenów jest wykorzystywane przez 3 różne modele.
 Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami, ile tokenów wykorzystują oraz jakie są koszty poszczególnych zapytań. Trzeba przy tym pamiętać, że liczba zużytych tokenów może się różnić, dlatego przedstawione wyniki mogą być inne niż wyniki zaobserwowane na innych środowiskach.
 
+
+## Źródła i materiały
+
+Poniżej znajduje się lista źródeł wykorzystanych podczas tworzenia artykułu.
+
+1. **Microsoft Azure Portal**  
+   https://portal.azure.com/  
+   Wykorzystane do utworzenia zasobu Microsoft Foundry oraz konfiguracji modeli używanych w projekcie.
+
+2. **Azure OpenAI Service Pricing**  
+   https://azure.microsoft.com/en-us/pricing/details/azure-openai/  
+   Wykorzystane do sprawdzenia aktualnych cen tokenów dla modeli:
+   - `gpt-5.4-mini`
+   - `gpt-5.6-terra`
+   - `gpt-5.6-sol`
+
+3. **AzureAiFoundryChatDemo – GitHub Repository**  
+   https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo  
+   Repozytorium zawierające kod źródłowy aplikacji przedstawionej w artykule.
+
+> **Informacja:** Dokumentacja, funkcjonalności Microsoft Foundry oraz ceny modeli mogą zmieniać się w czasie. Informacje przedstawione w artykule były aktualne w momencie jego tworzenia. W przypadku cen modeli warto zawsze zweryfikować aktualny cennik na oficjalnej stronie Microsoft Azure.
 
