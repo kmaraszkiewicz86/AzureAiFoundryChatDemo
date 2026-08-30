@@ -122,6 +122,14 @@ Ostatecznie moja lista deployment'u, jest pokazana na poniższym screen'ie:
 ## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i ile tokenów jest wykorzystywane przez 3 różne modele.
 Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami, ile tokenów wykorzystują oraz jakie są koszty poszczególnych zapytań. Trzeba przy tym pamiętać, że liczba zużytych tokenów może się różnić, dlatego przedstawione wyniki mogą być inne niż wyniki zaobserwowane na innych środowiskach.
 
+## Analiza modeli
+
+Najpierw zacznijmy od prostego pytania i zobaczymy jak sobie radzą 3 rózne modele poradzą, więc zaczynamy od pytania:
+`Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.`
+<img width="1895" height="280" alt="image" src="https://github.com/user-attachments/assets/a1bfe6d2-33b4-4560-b0ca-2edf0c5cdef6" />
+
+
+
 
 ## Źródła i materiały
 
