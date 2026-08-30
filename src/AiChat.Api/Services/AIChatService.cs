@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using OpenAI.Chat;
 using System.ClientModel;
+using System.Diagnostics;
 using System.Text;
 
 namespace AIChat.Api.Services;
@@ -150,6 +151,8 @@ public sealed class AIChatService : IAIChatService
         string deploymentName,
         CancellationToken cancellationToken = default)
     {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
         try
         {
             string chatPrompt = GenerateChatPrompt(question);
@@ -184,6 +187,8 @@ public sealed class AIChatService : IAIChatService
                 }
             }
 
+            stopwatch.Stop();
+
             // Mark only this deployment as complete; other deployment streams may still be running.
             await _chatHubContext.Clients
                 .Group(ChatHub.GetRequestGroupName(requestId))
@@ -192,17 +197,21 @@ public sealed class AIChatService : IAIChatService
                     new
                     {
                         RequestId = requestId,
-                        LLModelName = deploymentName
+                        LLModelName = deploymentName,
+                        stopwatch.ElapsedMilliseconds
                     },
                     cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            stopwatch.Stop();
             // Preserve host shutdown cancellation so the background worker can stop promptly.
             throw;
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+
             // Convert an individual model failure into a terminal SignalR event without failing sibling models.
             StringBuilder errorMessageStringBuilder = new();
 
@@ -219,7 +228,8 @@ public sealed class AIChatService : IAIChatService
                     {
                         RequestId = requestId,
                         LLModelName = deploymentName,
-                        Error = errorMessageStringBuilder.ToString()
+                        Error = errorMessageStringBuilder.ToString(),
+                        stopwatch.ElapsedMilliseconds
                     },
                     cancellationToken);
         }

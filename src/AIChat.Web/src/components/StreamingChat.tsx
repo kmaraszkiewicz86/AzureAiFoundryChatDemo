@@ -1,34 +1,47 @@
-import type { FormEvent } from 'react'
-import { useStreamingChat } from '../hooks/useStreamingChat'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import type { StreamingChatState } from '../models/streamingChatState'
+import { StreamingChatService } from '../services/streamingChatService'
 import { sanitizeAnswerHtml } from '../services/htmlSanitizer'
 
-/**
- * Presents the streaming chat form and model results while useStreamingChat owns
- * SignalR connection management, request orchestration, and response state.
- */
+/** Controls the form and displays results prepared by the streaming service. */
 function StreamingChat() {
-  const {
-    question,
-    setQuestion,
-    submittedQuestion,
-    responses,
-    error,
-    isLoading,
-    submitQuestion,
-  } = useStreamingChat()
+  const service = useRef(new StreamingChatService())
+  const [state, setState] = useState<StreamingChatState>({
+    submittedQuestion: '',
+    responses: [],
+    error: '',
+    isLoading: false,
+  })
+  const { submittedQuestion, responses, error, isLoading } = state
 
-  /** Prevents native form submission and delegates the workflow to the streaming hook. */
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const chatService = service.current
+    return () => {
+      void chatService.stop().catch(console.error)
+    }
+  }, [])
+
+  /** Passes the question to the service and displays its progress without processing model events. */
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await submitQuestion()
+    if (isLoading) return
+
+    const form = event.currentTarget
+    const question = String(new FormData(form).get('question') ?? '').trim()
+    if (!question) return
+
+    const queued = await service.current.ask(question, (progress) => {
+      setState({ submittedQuestion: question, ...progress })
+    })
+    if (queued) form.reset()
   }
 
   return (
     <section>
       <form onSubmit={handleSubmit}>
         <textarea
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
+          name="question"
+          disabled={isLoading}
           rows={4}
           cols={60}
           placeholder="Type your question here..."
@@ -42,24 +55,18 @@ function StreamingChat() {
 
       {error && <p>{error}</p>}
 
-      {/* Flex styling keeps all progressively rendered model articles side by side. */}
       {responses.length > 0 && (
         <div className="streaming-responses">
           {responses.map((response) => (
             <article className="streaming-response" key={response.LLModelName}>
               <strong>Model:</strong> <u>{response.LLModelName}</u>
-              <p>
-                <strong>Question:</strong> {submittedQuestion}
-              </p>
+              {response.status !== 'streaming' && (
+                <p><strong>Execution time:</strong> {response.elapsedMilliseconds} ms</p>
+              )}
+              <p><strong>Question:</strong> {submittedQuestion}</p>
               <div>
-                <p>
-                  <strong>Answer:</strong>
-                </p>
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: sanitizeAnswerHtml(response.answer),
-                  }}
-                />
+                <p><strong>Answer:</strong></p>
+                <div dangerouslySetInnerHTML={{ __html: sanitizeAnswerHtml(response.answer) }} />
                 {response.status === 'failed' && <p>{response.error}</p>}
               </div>
             </article>

@@ -1,6 +1,13 @@
 export class Environment {
   public static readonly apiUrl: string = 'http://localhost:5000'
 
+  /** HTTP endpoints used by the chat services. */
+  public static readonly chatUrl: string = `${Environment.apiUrl}/api/chat`
+  public static readonly streamingChatUrl: string = `${Environment.chatUrl}/stream`
+
+  /** Hub URL; the current development setup forwards this path through the Vite proxy. */
+  public static readonly chatHubUrl: string = '/hubs/chat'
+
   public static readonly allowedHtmlElements: ReadonlySet<string> = new Set([
     'A',
     'BLOCKQUOTE',
