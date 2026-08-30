@@ -30,9 +30,15 @@ public sealed class AIChatService : IAIChatService
         _options = azureOpenAIOptions.Value;
         _chatHubContext = chatHubContext;
 
+        AzureOpenAIClientOptions clientOptions = new()
+        {
+            NetworkTimeout = TimeSpan.FromMinutes(5)
+        };
+
         _client = new AzureOpenAIClient(
             new Uri(_options.Endpoint),
-            new ApiKeyCredential(_options.ApiKey));
+            new ApiKeyCredential(_options.ApiKey),
+            clientOptions);
     }
 
     /// <summary>
