@@ -5,19 +5,19 @@ Artykuł będzie przedstawiał, jak można z pomocą React + SignalR + .NET API 
 	#### Prompt:  <br />
 	Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.
 	- #### Dlaczego ten prompt?
-		To bardzo proste zadanie, które pozwala sprawdzić podstawową jakość generowanego kodu oraz to, czy model nie komplikuje niepotrzebnie prostego problemu. Jest też dobrym punktem 	odniesienia do porównania liczby wykorzystanych tokenów, czasu odpowiedzi i kosztu pomiędzy modelami.
+		To bardzo proste zadanie, które pozwala sprawdzić podstawową jakość generowanego kodu oraz to, czy model nie komplikuje niepotrzebnie prostego problemu. Jest też dobrym punktem odniesienia do porównania liczby wykorzystanych tokenów, czasu odpowiedzi i kosztu pomiędzy modelami.
 
 1. ### Średnio zaawansowane zadanie — implementacja REST API:  <br />
 	#### Prompt:  <br />
-	Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych 		wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania. 
+	Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania. 
 	- #### Dlaczego ten prompt?: <br />
-		To zadanie jest bliższe rzeczywistemu zastosowaniu modelu przez programistę. Pozwala sprawdzić, czy model poprawnie rozumie strukturę aplikacji ASP.NET Core, Dependency Injection, 		programowanie asynchroniczne oraz podstawowe zasady projektowania API. Odpowiedź powinna być wyraźnie bardziej rozbudowana niż w pierwszym teście, dlatego można również porównać 			wzrost liczby tokenów i kosztu.
+		To zadanie jest bliższe rzeczywistemu zastosowaniu modelu przez programistę. Pozwala sprawdzić, czy model poprawnie rozumie strukturę aplikacji ASP.NET Core, Dependency Injection, programowanie asynchroniczne oraz podstawowe zasady projektowania API. Odpowiedź powinna być wyraźnie bardziej rozbudowana niż w pierwszym teście, dlatego można również porównać wzrost liczby tokenów i kosztu.
 
 1. ### Zaawansowane zadanie — architektura i implementacja:  <br />
 	#### Prompt:  <br />
-	Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób 		przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.
+	Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.
 	- #### Dlaczego ten prompt?  <br />
-		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość reasoning, znajomość 	zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku będzie można sprawdzić, czy różnice pomiędzy słabszymi i mocniejszymi modelami są bardziej widoczne.
+		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość reasoning, znajomość zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku będzie można sprawdzić, czy różnice pomiędzy słabszymi i mocniejszymi modelami są bardziej widoczne.
 
 1. ### Analiza istniejącego kodu — Code Review
 
@@ -124,12 +124,58 @@ Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami,
 
 ## Analiza modeli
 
-Najpierw zacznijmy od prostego pytania i zobaczymy jak sobie radzą 3 rózne modele poradzą, więc zaczynamy od pytania:
+W artykule nie będą zamieszczane pełne odpowiedzi generowane przez poszczególne modele, ponieważ w przypadku bardziej rozbudowanych promptów mogą one być bardzo obszerne.
+
+Dla każdego testu szczegółowe wyniki będą zapisywane w repozytorium GitHub projektu:
+
+https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo
+
+Przy każdym porównaniu w artykule zostanie umieszczony link do odpowiedniego katalogu z wynikami. Dzięki temu będzie można sprawdzić:
+
+- dokładną treść promptu użytego w teście,
+- pełną odpowiedź wygenerowaną przez każdy z modeli,
+- liczbę tokenów wejściowych,
+- liczbę tokenów wyjściowych,
+- łączną liczbę wykorzystanych tokenów,
+- czas wykonania odpowiedzi,
+- szczegółowe wyliczenie kosztu dla danego modelu,
+- porównanie jakości odpowiedzi oraz opis najważniejszych różnic pomiędzy modelami.
+
+Dla każdego promptu zostanie również przygotowane osobne podsumowanie jakościowe odpowiedzi wszystkich modeli.
+
+Do wygenerowania tych podsumowań wykorzystałem aplikację Codex z modelem GPT-5.6 Sol High. Model analizował zapisane odpowiedzi i porównywał je między innymi pod kątem poprawności technicznej, kompletności, jakości kodu, podejścia architektonicznego, czytelności oraz praktycznej użyteczności.
+
+Takie podejście pozwala zachować czytelność samego artykułu, a jednocześnie daje możliwość samodzielnego przejrzenia pełnych wyników i zweryfikowania, na jakiej podstawie zostały wyciągnięte poszczególne wnioski.
+
+1. Najpierw zacznijmy od prostego pytania i zobaczymy jak sobie radzą 3 rózne modele poradzą, więc zaczynamy od pytania:
 `Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.`
-<img width="1895" height="280" alt="image" src="https://github.com/user-attachments/assets/a1bfe6d2-33b4-4560-b0ca-2edf0c5cdef6" />
+<img width="1906" height="370" alt="image" src="https://github.com/user-attachments/assets/277af9ab-6db3-4703-b592-bdd29df3ea78" />
+Wyniki są następujące:
 
+1. Teraz przejdźmy do bardziej złożonego pytania:
+`Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania.`
+<img width="1895" height="348" alt="image" src="https://github.com/user-attachments/assets/1b94c320-82c2-4e1a-9fc4-a8ec91b1d9fe" />
+Wyniki są następujące:
 
+1. Najpierw zacznijmy od prostego pytania i zobaczymy jak sobie radzą 3 rózne modele poradzą, więc zaczynamy od pytania:
+`Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.`
+Wyniki są następujące:
 
+1. Na koniec pytanie na prosty refactoring danej metody, można sprawdzić jak dane modele poradzą sobię z refactoringiem:
+`Przeanalizuj poniższy kod C#. Znajdź błędy, problemy związane z async/await, obsługą wyjątków, wydajnością oraz jakością kodu. Zaproponuj tylko niezbędne poprawki bez niepotrzebnego przepisywania całej implementacji. Wyjaśnij każdą zaproponowaną zmianę.
+	
+	public async Task<Product?> GetProductAsync(int id)
+	{
+	    var product = _repository.GetById(id);
+	
+	    if (product == null)
+	    {
+	        throw new Exception("Product not found");
+	    }
+	
+	    return await Task.FromResult(product);
+	}`
+Wyniki są następujące:
 
 ## Źródła i materiały
 
