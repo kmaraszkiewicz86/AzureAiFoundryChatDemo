@@ -1,0 +1,74 @@
+\<article class="streaming-response">\<strong>Model:\</strong> \<u>gpt-5.6-terra-medium\</u>\<p>\<strong>Execution time:\</strong> 13777 ms\</p>\<p>\<strong>Input tokens:\</strong> 1066\</p>\<p>\<strong>Output tokens:\</strong> 1098\</p>\<p>\<strong>Total tokens:\</strong> 2164\</p>\<p>\<strong>Question:\</strong> Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.\</p>\<div>\<p>\<strong>Answer:\</strong>\</p>\<div>\<div class="vertical-stack">
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Przegląd rozwiązania\</h2>
+&#x20;   \<p>To prosta aplikacja konsolowa w C#, która wypisuje komunikat \<strong>Hello, World!\</strong>. Projekt wykorzystuje stabilną wersję \<strong>.NET 10\</strong> oraz nowoczesny uproszczony styl programu z instrukcjami najwyższego poziomu.\</p>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Wymagania\</h2>
+&#x20;   \<ul>
+&#x20;     \<li>Zainstalowany .NET SDK 10 lub nowszy zgodny z platformą docelową.\</li>
+&#x20;     \<li>Dowolny terminal, na przykład Windows Terminal, PowerShell, Bash lub terminal w Visual Studio Code.\</li>
+&#x20;   \</ul>
+&#x20;   \<p>Weryfikacja zainstalowanego SDK:\</p>
+&#x20;   \<pre>\<code class="language-bash">dotnet --version\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Struktura projektu\</h2>
+&#x20;   \<pre>\<code class="language-text">HelloWorld/
+├── HelloWorld.csproj
+└── Program.cs\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Implementacja\</h2>
+&#x20;   \<h3>Program.cs\</h3>
+&#x20;   \<p>Główny punkt wejścia aplikacji. Instrukcja zapisuje tekst na standardowym wyjściu konsoli.\</p>
+&#x20;   \<pre>\<code class="language-csharp">Console.WriteLine("Hello, World!");\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Konfiguracja projektu\</h2>
+&#x20;   \<h3>HelloWorld.csproj\</h3>
+&#x20;   \<p>Plik projektu definiuje aplikację jako wykonywalną aplikację konsolową, używającą platformy .NET 10 oraz włączonych standardowych ustawień nowoczesnego C#.\</p>
+&#x20;   \<pre>\<code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+
+&#x20; &lt;PropertyGroup&gt;
+&#x20;   &lt;OutputType&gt;Exe&lt;/OutputType&gt;
+&#x20;   &lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;
+&#x20;   &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+&#x20;   &lt;Nullable&gt;enable&lt;/Nullable&gt;
+&#x20; &lt;/PropertyGroup&gt;
+
+&lt;/Project&gt;\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Tworzenie, kompilowanie i uruchamianie\</h2>
+&#x20;   \<p>W terminalu utwórz katalog projektu, dodaj pokazane pliki, a następnie uruchom aplikację:\</p>
+&#x20;   \<pre>\<code class="language-bash">mkdir HelloWorld
+cd HelloWorld
+
+dotnet run\</code>\</pre>
+&#x20;   \<p>Alternatywnie można utworzyć początkowy projekt poleceniem CLI:\</p>
+&#x20;   \<pre>\<code class="language-bash">dotnet new console --framework net10.0 --name HelloWorld
+cd HelloWorld
+dotnet run\</code>\</pre>
+&#x20;   \<p>Oczekiwany wynik:\</p>
+&#x20;   \<pre>\<code class="language-text">Hello, World!\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Jak działa aplikacja\</h2>
+&#x20;   \<p>Metoda \<code>Console.WriteLine\</code> zapisuje przekazany łańcuch znaków do konsoli i dodaje znak nowej linii. Dzięki instrukcjom najwyższego poziomu nie trzeba ręcznie deklarować klasy \<code>Program\</code> ani metody \<code>Main\</code>; kompilator generuje je automatycznie.\</p>
+&#x20;   \<p>Aplikacja nie przyjmuje danych wejściowych, nie używa zewnętrznych pakietów ani konfiguracji, dlatego nie wymaga dodatkowej walidacji ani konfiguracji zabezpieczeń.\</p>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Weryfikacja\</h2>
+&#x20;   \<p>Polecenie kompilacji sprawdza, czy projekt buduje się poprawnie:\</p>
+&#x20;   \<pre>\<code class="language-bash">dotnet build\</code>\</pre>
+&#x20;   \<p>Następnie uruchomienie \<code>dotnet run\</code> powinno wyświetlić dokładnie komunikat \<code>Hello, World!\</code>.\</p>
+&#x20; \</section>
+\</div>\</div>\</div>\</article>

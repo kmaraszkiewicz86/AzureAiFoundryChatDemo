@@ -1,0 +1,864 @@
+<article class="streaming-response"><strong>Model:</strong> <u>gpt-5.4-mini-low</u><p><strong>Execution time:</strong> 31716 ms</p><p><strong>Input tokens:</strong> 1135</p><p><strong>Output tokens:</strong> 8685</p><p><strong>Total tokens:</strong> 9820</p><p><strong>Question:</strong> Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.</p><div><p><strong>Answer:</strong></p><div><div class="vertical-stack">
+  <section class="vertical-stack-item">
+    <h2>Solution overview</h2>
+    <p>Proponowane rozwiązanie to produkcyjne REST API w ASP.NET Core 8 do obsługi zamówień, zaprojektowane pod dużą liczbę równoległych requestów, z naciskiem na skalowalność horyzontalną, odporność na błędy i przewidywalne opóźnienia.</p>
+    <ul>
+      <li><strong>Architektura:</strong> warstwowa, z wyraźnym podziałem na API, aplikację, domenę i infrastrukturę.</li>
+      <li><strong>Przetwarzanie:</strong> stateless API, dzięki czemu można skalować wiele instancji za load balancerem.</li>
+      <li><strong>Persistencja:</strong> PostgreSQL jako główna baza danych, EF Core jako ORM, transakcje i kontrola współbieżności.</li>
+      <li><strong>Cache:</strong> Redis jako rozproszony cache dla odczytów i danych referencyjnych; bez cache dla krytycznej ścieżki tworzenia zamówienia.</li>
+      <li><strong>Bezpieczeństwo:</strong> JWT Bearer, walidacja wejścia, rate limiting, HTTPS, problem details, idempotency key.</li>
+      <li><strong>Obserwowalność:</strong> ustrukturyzowane logowanie, OpenTelemetry, metryki i śledzenie rozproszone.</li>
+    </ul>
+    <p>Endpoint tworzenia zamówienia pokazany niżej stosuje zasadę: szybka walidacja, transakcja w bazie, bezpieczny zapis, spójna odpowiedź. Dzięki temu rozwiązanie jest odporne na retry z klienta i dobrze działa pod wysokim obciążeniem.</p>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Prerequisites</h2>
+    <ul>
+      <li>.NET 8 SDK</li>
+      <li>PostgreSQL 15+ lub 16+</li>
+      <li>Redis 7+</li>
+      <li>Opcjonalnie: Docker i Docker Compose do lokalnego uruchamiania infrastruktury</li>
+      <li>Pakiety NuGet: Entity Framework Core, Npgsql, Redis cache, Swagger, Serilog, OpenTelemetry, AspNetCore rate limiting, FluentValidation</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Project structure</h2>
+    <pre><code class="language-text">OrdersApi/
+├── src/
+│   ├── Orders.Api/
+│   │   ├── Controllers/
+│   │   │   └── OrdersController.cs
+│   │   ├── Middleware/
+│   │   │   └── ExceptionHandlingMiddleware.cs
+│   │   ├── Program.cs
+│   │   ├── appsettings.json
+│   │   └── Orders.Api.csproj
+│   ├── Orders.Application/
+│   │   ├── Orders/
+│   │   │   ├── CreateOrderCommand.cs
+│   │   │   ├── CreateOrderCommandValidator.cs
+│   │   │   ├── CreateOrderResult.cs
+│   │   │   ├── IOrderService.cs
+│   │   │   └── OrderService.cs
+│   │   └── Orders.Application.csproj
+│   ├── Orders.Domain/
+│   │   ├── Common/
+│   │   │   ├── DomainException.cs
+│   │   │   └── Result.cs
+│   │   ├── Orders/
+│   │   │   ├── Order.cs
+│   │   │   ├── OrderItem.cs
+│   │   │   └── OrderStatus.cs
+│   │   └── Orders.Domain.csproj
+│   └── Orders.Infrastructure/
+│       ├── Caching/
+│       │   └── CacheKeys.cs
+│       ├── Data/
+│       │   ├── OrdersDbContext.cs
+│       │   ├── OrdersDbContextFactory.cs
+│       │   └── OrderEntityConfiguration.cs
+│       ├── DependencyInjection.cs
+│       ├── Migrations/
+│       └── Orders.Infrastructure.csproj
+└── tests/
+    └── Orders.Api.Tests/
+        └── OrdersControllerTests.cs</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Implementation</h2>
+
+    <h3>src/Orders.Domain/Orders/OrderStatus.cs</h3>
+    <p>Enum stanu zamówienia, używany w domenie i persystencji.</p>
+    <pre><code class="language-csharp">namespace Orders.Domain.Orders;
+
+public enum OrderStatus
+{
+    Pending = 1,
+    Confirmed = 2,
+    Cancelled = 3
+}</code></pre>
+
+    <h3>src/Orders.Domain/Orders/OrderItem.cs</h3>
+    <p>Wartościowy obiekt opisujący pojedynczą pozycję zamówienia.</p>
+    <pre><code class="language-csharp">namespace Orders.Domain.Orders;
+
+public sealed class OrderItem
+{
+    private OrderItem() { }
+
+    public OrderItem(Guid productId, string name, decimal unitPrice, int quantity)
+    {
+        if (productId == Guid.Empty) throw new ArgumentException("ProductId is required.", nameof(productId));
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name is required.", nameof(name));
+        if (unitPrice &lt;= 0) throw new ArgumentOutOfRangeException(nameof(unitPrice));
+        if (quantity &lt;= 0) throw new ArgumentOutOfRangeException(nameof(quantity));
+
+        ProductId = productId;
+        Name = name.Trim();
+        UnitPrice = unitPrice;
+        Quantity = quantity;
+    }
+
+    public int Id { get; private set; }
+    public Guid ProductId { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public decimal UnitPrice { get; private set; }
+    public int Quantity { get; private set; }
+
+    public decimal LineTotal =&gt; UnitPrice * Quantity;
+}</code></pre>
+
+    <h3>src/Orders.Domain/Orders/Order.cs</h3>
+    <p>Agregat zamówienia, pilnujący spójności biznesowej.</p>
+    <pre><code class="language-csharp">namespace Orders.Domain.Orders;
+
+public sealed class Order
+{
+    private readonly List&lt;OrderItem&gt; _items = new();
+
+    private Order() { }
+
+    public Order(Guid customerId, string currency, string? idempotencyKey)
+    {
+        if (customerId == Guid.Empty) throw new ArgumentException("CustomerId is required.", nameof(customerId));
+        if (string.IsNullOrWhiteSpace(currency)) throw new ArgumentException("Currency is required.", nameof(currency));
+
+        Id = Guid.NewGuid();
+        CustomerId = customerId;
+        Currency = currency.Trim().ToUpperInvariant();
+        IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey.Trim();
+        Status = OrderStatus.Pending;
+        CreatedAtUtc = DateTime.UtcNow;
+    }
+
+    public Guid Id { get; private set; }
+    public Guid CustomerId { get; private set; }
+    public string Currency { get; private set; } = string.Empty;
+    public string? IdempotencyKey { get; private set; }
+    public OrderStatus Status { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; }
+
+    public IReadOnlyCollection&lt;OrderItem&gt; Items =&gt; _items.AsReadOnly();
+    public decimal TotalAmount =&gt; _items.Sum(x =&gt; x.LineTotal);
+
+    public void AddItem(Guid productId, string name, decimal unitPrice, int quantity)
+    {
+        _items.Add(new OrderItem(productId, name, unitPrice, quantity));
+    }
+
+    public void Confirm()
+    {
+        if (_items.Count == 0)
+            throw new InvalidOperationException("Order must contain at least one item.");
+
+        Status = OrderStatus.Confirmed;
+    }
+}</code></pre>
+
+    <h3>src/Orders.Domain/Common/DomainException.cs</h3>
+    <p>Wyjątek domenowy mapowany później na odpowiedź HTTP 400/409.</p>
+    <pre><code class="language-csharp">namespace Orders.Domain.Common;
+
+public sealed class DomainException : Exception
+{
+    public DomainException(string message) : base(message) { }
+}</code></pre>
+
+    <h3>src/Orders.Domain/Common/Result.cs</h3>
+    <p>Minimalny typ wyniku dla czytelnego przepływu błędów aplikacyjnych.</p>
+    <pre><code class="language-csharp">namespace Orders.Domain.Common;
+
+public sealed class Result
+{
+    private Result(bool isSuccess, string? error)
+    {
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public bool IsSuccess { get; }
+    public string? Error { get; }
+
+    public static Result Success() =&gt; new(true, null);
+    public static Result Failure(string error) =&gt; new(false, error);
+}</code></pre>
+
+    <h3>src/Orders.Application/Orders/CreateOrderCommand.cs</h3>
+    <p>DTO wejściowe dla tworzenia zamówienia.</p>
+    <pre><code class="language-csharp">namespace Orders.Application.Orders;
+
+public sealed record CreateOrderCommand(
+    Guid CustomerId,
+    string Currency,
+    string? IdempotencyKey,
+    IReadOnlyList&lt;CreateOrderItemCommand&gt; Items);
+
+public sealed record CreateOrderItemCommand(
+    Guid ProductId,
+    string Name,
+    decimal UnitPrice,
+    int Quantity);</code></pre>
+
+    <h3>src/Orders.Application/Orders/CreateOrderResult.cs</h3>
+    <p>DTO wyjściowe zwracane przez serwis i API.</p>
+    <pre><code class="language-csharp">namespace Orders.Application.Orders;
+
+public sealed record CreateOrderResult(
+    Guid OrderId,
+    Guid CustomerId,
+    string Currency,
+    decimal TotalAmount,
+    string Status,
+    DateTime CreatedAtUtc);</code></pre>
+
+    <h3>src/Orders.Application/Orders/IOrderService.cs</h3>
+    <p>Kontrakt serwisu aplikacyjnego.</p>
+    <pre><code class="language-csharp">namespace Orders.Application.Orders;
+
+public interface IOrderService
+{
+    Task&lt;CreateOrderResult&gt; CreateAsync(CreateOrderCommand command, CancellationToken cancellationToken);
+}</code></pre>
+
+    <h3>src/Orders.Application/Orders/CreateOrderCommandValidator.cs</h3>
+    <p>Walidacja wejścia na poziomie aplikacji, przed wejściem do bazy.</p>
+    <pre><code class="language-csharp">using FluentValidation;
+
+namespace Orders.Application.Orders;
+
+public sealed class CreateOrderCommandValidator : AbstractValidator&lt;CreateOrderCommand&gt;
+{
+    public CreateOrderCommandValidator()
+    {
+        RuleFor(x =&gt; x.CustomerId)
+            .NotEmpty();
+
+        RuleFor(x =&gt; x.Currency)
+            .NotEmpty()
+            .Length(3, 3);
+
+        RuleFor(x =&gt; x.Items)
+            .NotNull()
+            .Must(items =&gt; items.Count &gt; 0)
+            .WithMessage("At least one item is required.");
+
+        RuleForEach(x =&gt; x.Items).ChildRules(item =&gt;
+        {
+            item.RuleFor(x =&gt; x.ProductId).NotEmpty();
+            item.RuleFor(x =&gt; x.Name).NotEmpty().MaximumLength(200);
+            item.RuleFor(x =&gt; x.UnitPrice).GreaterThan(0);
+            item.RuleFor(x =&gt; x.Quantity).GreaterThan(0);
+        });
+    }
+}</code></pre>
+
+    <h3>src/Orders.Application/Orders/OrderService.cs</h3>
+    <p>Warstwa serwisowa z logiką biznesową, transakcją i obsługą idempotencji.</p>
+    <pre><code class="language-csharp">using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Orders.Domain.Common;
+using Orders.Domain.Orders;
+using Orders.Infrastructure.Data;
+
+namespace Orders.Application.Orders;
+
+public sealed class OrderService : IOrderService
+{
+    private readonly OrdersDbContext _dbContext;
+    private readonly IValidator&lt;CreateOrderCommand&gt; _validator;
+    private readonly ILogger&lt;OrderService&gt; _logger;
+
+    public OrderService(
+        OrdersDbContext dbContext,
+        IValidator&lt;CreateOrderCommand&gt; validator,
+        ILogger&lt;OrderService&gt; logger)
+    {
+        _dbContext = dbContext;
+        _validator = validator;
+        _logger = logger;
+    }
+
+    public async Task&lt;CreateOrderResult&gt; CreateAsync(CreateOrderCommand command, CancellationToken cancellationToken)
+    {
+        var validationResult = await _validator.ValidateAsync(command, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            var message = string.Join("; ", validationResult.Errors.Select(e =&gt; e.ErrorMessage));
+            throw new DomainException(message);
+        }
+
+        if (!string.IsNullOrWhiteSpace(command.IdempotencyKey))
+        {
+            var existing = await _dbContext.Orders
+                .AsNoTracking()
+                .Where(x =&gt; x.IdempotencyKey == command.IdempotencyKey)
+                .Select(x =&gt; new CreateOrderResult(x.Id, x.CustomerId, x.Currency, x.TotalAmount, x.Status.ToString(), x.CreatedAtUtc))
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existing is not null)
+            {
+                _logger.LogInformation("Idempotent replay detected for key {IdempotencyKey}.", command.IdempotencyKey);
+                return existing;
+            }
+        }
+
+        var order = new Order(command.CustomerId, command.Currency, command.IdempotencyKey);
+
+        foreach (var item in command.Items)
+        {
+            order.AddItem(item.ProductId, item.Name, item.UnitPrice, item.Quantity);
+        }
+
+        order.Confirm();
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        _dbContext.Orders.Add(order);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        _logger.LogInformation("Order {OrderId} created for customer {CustomerId}.", order.Id, order.CustomerId);
+
+        return new CreateOrderResult(
+            order.Id,
+            order.CustomerId,
+            order.Currency,
+            order.TotalAmount,
+            order.Status.ToString(),
+            order.CreatedAtUtc);
+    }
+}</code></pre>
+
+    <h3>src/Orders.Infrastructure/Data/OrdersDbContext.cs</h3>
+    <p>DbContext z mapowaniem agregatu zamówienia.</p>
+    <pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+using Orders.Domain.Orders;
+
+namespace Orders.Infrastructure.Data;
+
+public sealed class OrdersDbContext : DbContext
+{
+    public OrdersDbContext(DbContextOptions&lt;OrdersDbContext&gt; options) : base(options) { }
+
+    public DbSet&lt;Order&gt; Orders =&gt; Set&lt;Order&gt;();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfiguration(new OrderEntityConfiguration());
+        base.OnModelCreating(modelBuilder);
+    }
+}</code></pre>
+
+    <h3>src/Orders.Infrastructure/Data/OrderEntityConfiguration.cs</h3>
+    <p>Konfiguracja EF Core dla wydajnego zapisu i poprawnej relacji one-to-many.</p>
+    <pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Orders.Domain.Orders;
+
+namespace Orders.Infrastructure.Data;
+
+public sealed class OrderEntityConfiguration : IEntityTypeConfiguration&lt;Order&gt;
+{
+    public void Configure(EntityTypeBuilder&lt;Order&gt; builder)
+    {
+        builder.ToTable("Orders");
+
+        builder.HasKey(x =&gt; x.Id);
+        builder.Property(x =&gt; x.Currency).HasMaxLength(3).IsRequired();
+        builder.Property(x =&gt; x.IdempotencyKey).HasMaxLength(100);
+        builder.Property(x =&gt; x.Status).IsRequired();
+        builder.Property(x =&gt; x.CustomerId).IsRequired();
+        builder.Property(x =&gt; x.CreatedAtUtc).IsRequired();
+
+        builder.HasIndex(x =&gt; x.IdempotencyKey)
+            .IsUnique()
+            .HasFilter(""IdempotencyKey" IS NOT NULL");
+
+        builder.HasMany(typeof(OrderItem), "_items")
+            .WithOne()
+            .HasForeignKey("OrderId")
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation("_items").UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}</code></pre>
+
+    <h3>src/Orders.Infrastructure/Caching/CacheKeys.cs</h3>
+    <p>Centralizacja kluczy cache ułatwia utrzymanie i unikanie kolizji.</p>
+    <pre><code class="language-csharp">namespace Orders.Infrastructure.Caching;
+
+public static class CacheKeys
+{
+    public static string OrderById(Guid orderId) =&gt; $"orders:by-id:{orderId}";
+    public static string ProductById(Guid productId) =&gt; $"products:by-id:{productId}";
+}</code></pre>
+
+    <h3>src/Orders.Infrastructure/DependencyInjection.cs</h3>
+    <p>Rejestracja infrastruktury, EF Core i cache.</p>
+    <pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Orders.Infrastructure.Data;
+
+namespace Orders.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddDbContextPool&lt;OrdersDbContext&gt;(options =&gt;
+        {
+            options.UseNpgsql(configuration.GetConnectionString("OrdersDb"));
+        });
+
+        services.AddStackExchangeRedisCache(options =&gt;
+        {
+            options.Configuration = configuration.GetConnectionString("Redis");
+            options.InstanceName = "orders-api:";
+        });
+
+        return services;
+    }
+}</code></pre>
+
+    <h3>src/Orders.Api/Middleware/ExceptionHandlingMiddleware.cs</h3>
+    <p>Centralna obsługa wyjątków z odpowiedziami Problem Details.</p>
+    <pre><code class="language-csharp">using System.Net;
+using Orders.Domain.Common;
+
+namespace Orders.Api.Middleware;
+
+public sealed class ExceptionHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger&lt;ExceptionHandlingMiddleware&gt; _logger;
+
+    public ExceptionHandlingMiddleware(RequestDelegate next, ILogger&lt;ExceptionHandlingMiddleware&gt; logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain error while processing request.");
+            await WriteProblemDetails(context, HttpStatusCode.BadRequest, ex.Message, "domain_error");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception.");
+            await WriteProblemDetails(context, HttpStatusCode.InternalServerError, "An unexpected error occurred.", "internal_error");
+        }
+    }
+
+    private static async Task WriteProblemDetails(HttpContext context, HttpStatusCode statusCode, string detail, string errorCode)
+    {
+        context.Response.StatusCode = (int)statusCode;
+        context.Response.ContentType = "application/problem+json";
+
+        var problem = new
+        {
+            type = $"https://httpstatuses.com/{(int)statusCode}",
+            title = ReasonPhrases.GetReasonPhrase((int)statusCode),
+            status = (int)statusCode,
+            detail,
+            errorCode,
+            traceId = context.TraceIdentifier
+        };
+
+        await context.Response.WriteAsJsonAsync(problem);
+    }
+}</code></pre>
+
+    <h3>src/Orders.Api/Controllers/OrdersController.cs</h3>
+    <p>Endpoint HTTP tworzący zamówienie.</p>
+    <pre><code class="language-csharp">using Microsoft.AspNetCore.Mvc;
+using Orders.Application.Orders;
+
+namespace Orders.Api.Controllers;
+
+[ApiController]
+[Route("api/orders")]
+public sealed class OrdersController : ControllerBase
+{
+    private readonly IOrderService _orderService;
+    private readonly ILogger&lt;OrdersController&gt; _logger;
+
+    public OrdersController(IOrderService orderService, ILogger&lt;OrdersController&gt; logger)
+    {
+        _orderService = orderService;
+        _logger = logger;
+    }
+
+    [HttpPost]
+    [ProducesResponseType(typeof(CreateOrderResult), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task&lt;ActionResult&lt;CreateOrderResult&gt;&gt; Create(
+        [FromBody] CreateOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new CreateOrderCommand(
+            request.CustomerId,
+            request.Currency,
+            Request.Headers.IdempotencyKey.FirstOrDefault(),
+            request.Items.Select(x =&gt; new CreateOrderItemCommand(x.ProductId, x.Name, x.UnitPrice, x.Quantity)).ToList());
+
+        var result = await _orderService.CreateAsync(command, cancellationToken);
+
+        return CreatedAtAction(nameof(GetById), new { id = result.OrderId }, result);
+    }
+
+    [HttpGet("{id:guid}")]
+    public ActionResult&lt;string&gt; GetById(Guid id)
+    {
+        return Ok($"Order {id}");
+    }
+
+    public sealed record CreateOrderRequest(
+        Guid CustomerId,
+        string Currency,
+        IReadOnlyList&lt;CreateOrderItemRequest&gt; Items);
+
+    public sealed record CreateOrderItemRequest(
+        Guid ProductId,
+        string Name,
+        decimal UnitPrice,
+        int Quantity);
+}</code></pre>
+
+    <h3>src/Orders.Api/Program.cs</h3>
+    <p>Konfiguracja aplikacji, middleware, rate limiting, Swagger, logging i monitoring.</p>
+    <pre><code class="language-csharp">using FluentValidation;
+using Microsoft.AspNetCore.RateLimiting;
+using Orders.Api.Middleware;
+using Orders.Application.Orders;
+using Orders.Infrastructure;
+using Serilog;
+using System.Threading.RateLimiting;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, services, configuration) =&gt;
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "Orders.Api");
+});
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddProblemDetails();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddInfrastructure(builder.Configuration);
+
+builder.Services.AddScoped&lt;IOrderService, OrderService&gt;();
+builder.Services.AddScoped&lt;IValidator&lt;CreateOrderCommand&gt;, CreateOrderCommandValidator&gt;();
+
+builder.Services.AddRateLimiter(options =&gt;
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("orders-write", limiterOptions =&gt;
+    {
+        limiterOptions.Window = TimeSpan.FromSeconds(1);
+        limiterOptions.PermitLimit = 100;
+        limiterOptions.QueueLimit = 0;
+        limiterOptions.AutoReplenishment = true;
+    });
+});
+
+var app = builder.Build();
+
+app.UseMiddleware&lt;ExceptionHandlingMiddleware&gt;();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+
+app.UseSerilogRequestLogging();
+app.UseRateLimiter();
+
+app.MapControllers();
+
+app.Run();</code></pre>
+
+    <h3>src/Orders.Api/appsettings.json</h3>
+    <p>Konfiguracja połączeń, logowania i telemetry.</p>
+    <pre><code class="language-json">{
+  "ConnectionStrings": {
+    "OrdersDb": "Host=localhost;Port=5432;Database=ordersdb;Username=orders;Password=orders_password",
+    "Redis": "localhost:6379"
+  },
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      { "Name": "Console" }
+    ],
+    "Enrich": [ "FromLogContext" ]
+  },
+  "AllowedHosts": "*"
+}</code></pre>
+
+    <h3>src/Orders.Api/Orders.Api.csproj</h3>
+    <p>Projekt API i zależności pakietów.</p>
+    <pre><code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;TreatWarningsAsErrors&gt;true&lt;/TreatWarningsAsErrors&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include="..\Orders.Application\Orders.Application.csproj" /&gt;
+    &lt;ProjectReference Include="..\Orders.Infrastructure\Orders.Infrastructure.csproj" /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.11.0" /&gt;
+    &lt;PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.10" /&gt;
+    &lt;PackageReference Include="Serilog.AspNetCore" Version="8.0.3" /&gt;
+    &lt;PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" /&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Project&gt;</code></pre>
+
+    <h3>src/Orders.Application/Orders.Application.csproj</h3>
+    <p>Warstwa aplikacyjna.</p>
+    <pre><code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;TreatWarningsAsErrors&gt;true&lt;/TreatWarningsAsErrors&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include="..\Orders.Domain\Orders.Domain.csproj" /&gt;
+    &lt;ProjectReference Include="..\Orders.Infrastructure\Orders.Infrastructure.csproj" /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="FluentValidation" Version="11.11.0" /&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Project&gt;</code></pre>
+
+    <h3>src/Orders.Domain/Orders.Domain.csproj</h3>
+    <p>Warstwa domenowa bez zależności od infrastruktury.</p>
+    <pre><code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;TreatWarningsAsErrors&gt;true&lt;/TreatWarningsAsErrors&gt;
+  &lt;/PropertyGroup&gt;
+&lt;/Project&gt;</code></pre>
+
+    <h3>src/Orders.Infrastructure/Orders.Infrastructure.csproj</h3>
+    <p>Infrastruktura: EF Core, PostgreSQL i cache.</p>
+    <pre><code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+    &lt;TreatWarningsAsErrors&gt;true&lt;/TreatWarningsAsErrors&gt;
+  &lt;/PropertyGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;ProjectReference Include="..\Orders.Domain\Orders.Domain.csproj" /&gt;
+  &lt;/ItemGroup&gt;
+
+  &lt;ItemGroup&gt;
+    &lt;PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.10" /&gt;
+    &lt;PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10"&gt;
+      &lt;PrivateAssets&gt;all&lt;/PrivateAssets&gt;
+      &lt;IncludeAssets&gt;runtime; build; native; contentfiles; analyzers; buildtransitive&lt;/IncludeAssets&gt;
+    &lt;/PackageReference&gt;
+    &lt;PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.6" /&gt;
+    &lt;PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.1" /&gt;
+  &lt;/ItemGroup&gt;
+&lt;/Project&gt;</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Configuration</h2>
+    <h3>Architektura uruchomieniowa</h3>
+    <ul>
+      <li><strong>Load balancer</strong> rozdziela ruch na wiele instancji API.</li>
+      <li><strong>API jest stateless</strong> — brak sesji w pamięci procesu jako źródła prawdy.</li>
+      <li><strong>PostgreSQL</strong> przechowuje dane transakcyjne.</li>
+      <li><strong>Redis</strong> przechowuje cache odczytów oraz ewentualnie krótkotrwałe klucze idempotencyjności, jeśli chcemy dodatkowo zabezpieczyć się przed duplikacją poza bazą.</li>
+      <li><strong>OpenTelemetry</strong> wysyła trace i metryki do backendu obserwowalności.</li>
+    </ul>
+
+    <h3>Strategia cache</h3>
+    <ul>
+      <li><strong>Cache-aside</strong> dla odczytów: najpierw Redis, potem baza, po odczycie zapis do cache.</li>
+      <li><strong>TTL</strong> krótki i zależny od typu danych, np. 1-5 minut dla danych zamówień, dłuższy dla słowników.</li>
+      <li><strong>Invalidacja</strong> po zapisie przez usunięcie lub odświeżenie odpowiednich kluczy.</li>
+      <li><strong>Nie cache'ować krytycznego POST</strong> tworzącego zamówienie, ponieważ zapis musi być transakcyjny i jednoznaczny.</li>
+    </ul>
+
+    <h3>Obsługa błędów</h3>
+    <ul>
+      <li><strong>Validation errors</strong> zwracane jako 400 z problem details.</li>
+      <li><strong>Conflict</strong> dla sytuacji biznesowych, np. duplikat idempotency key lub naruszenie reguł.</li>
+      <li><strong>500</strong> tylko dla błędów nieprzewidzianych.</li>
+      <li><strong>Middleware</strong> centralizuje format odpowiedzi i logowanie wyjątków.</li>
+    </ul>
+
+    <h3>Logging i monitoring</h3>
+    <ul>
+      <li><strong>Serilog</strong> z logami strukturalnymi i correlation id.</li>
+      <li><strong>Serilog Request Logging</strong> do pomiaru czasu requestów.</li>
+      <li><strong>OpenTelemetry</strong> dla trace i metryk.</li>
+      <li><strong>Kluczowe metryki:</strong> latency, error rate, throughput, DB roundtrips, cache hit ratio.</li>
+    </ul>
+
+    <h3>Zabezpieczenia</h3>
+    <ul>
+      <li><strong>HTTPS only</strong>.</li>
+      <li><strong>JWT Bearer</strong> lub OAuth2/OIDC w środowisku produkcyjnym.</li>
+      <li><strong>Rate limiting</strong> na endpointy write-heavy, aby chronić bazę.</li>
+      <li><strong>Idempotency-Key</strong> dla POST tworzących zamówienie.</li>
+      <li><strong>Walidacja danych wejściowych</strong> po stronie API i serwisu.</li>
+      <li><strong>Least privilege</strong> dla konta bazy i sekrety w Secret Manager lub vault.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>How it works</h2>
+    <ol>
+      <li>Klient wysyła <strong>POST /api/orders</strong> z danymi zamówienia oraz opcjonalnym nagłówkiem <strong>Idempotency-Key</strong>.</li>
+      <li>Controller mapuje request na command i przekazuje do serwisu aplikacyjnego.</li>
+      <li>Validator sprawdza poprawność wejścia zanim uruchomiona zostanie transakcja.</li>
+      <li>Serwis sprawdza, czy dla danego klucza idempotency istnieje już zamówienie; jeśli tak, zwraca istniejący wynik.</li>
+      <li>W przeciwnym razie budowany jest agregat domenowy, a następnie zapisywany w transakcji do PostgreSQL.</li>
+      <li>Middleware obsługi wyjątków zamienia błędy na spójny format Problem Details.</li>
+      <li>Logi i telemetry umożliwiają diagnozę problemów oraz ocenę wydajności pod wysokim ruchem.</li>
+    </ol>
+
+    <h3>Najważniejsze decyzje architektoniczne</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Decyzja</th>
+          <th>Zalety</th>
+          <th>Wady</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Warstwy API/Application/Domain/Infrastructure</td>
+          <td>Czysty podział odpowiedzialności, łatwiejsze testy, mniejszy coupling</td>
+          <td>Więcej plików i trochę większy narzut organizacyjny</td>
+        </tr>
+        <tr>
+          <td>Stateless API</td>
+          <td>Łatwe skalowanie horyzontalne, odporność na awarie pojedynczej instancji</td>
+          <td>Wymaga zewnętrznego stanu: DB, Redis, tokeny</td>
+        </tr>
+        <tr>
+          <td>PostgreSQL jako source of truth</td>
+          <td>Spójność transakcyjna, dojrzałe mechanizmy indeksów i blokad</td>
+          <td>Trzeba uważać na wydajność i poprawną izolację transakcji</td>
+        </tr>
+        <tr>
+          <td>Redis cache</td>
+          <td>Znacząco odciąża bazę przy odczytach</td>
+          <td>Dochodzi problem spójności cache i invalidacji</td>
+        </tr>
+        <tr>
+          <td>Idempotency key</td>
+          <td>Bezpieczne retry na POST bez duplikowania zamówień</td>
+          <td>Wymaga dodatkowego indeksu i logiki obsługi</td>
+        </tr>
+        <tr>
+          <td>Rate limiting</td>
+          <td>Chroni bazę i backend przed skokami ruchu</td>
+          <td>Źle ustawione limity mogą zablokować legalny ruch</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Uwagi produkcyjne</h3>
+    <ul>
+      <li>W prawdziwej wersji dodałbym osobny endpoint GET zwracający zamówienie z cache-aside.</li>
+      <li>Wysokie obciążenie write-heavy może wymagać kolejkowania części operacji, np. integracji z płatnościami lub fulfillmentem.</li>
+      <li>Jeśli wymagane są bardzo wysokie gwarancje spójności, warto rozważyć outbox pattern dla zdarzeń integracyjnych.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Build and run</h2>
+    <h3>Restore and build</h3>
+    <pre><code class="language-bash">dotnet restore
+dotnet build</code></pre>
+
+    <h3>Apply migrations</h3>
+    <pre><code class="language-bash">dotnet ef migrations add InitialCreate -p src/Orders.Infrastructure -s src/Orders.Api
+dotnet ef database update -p src/Orders.Infrastructure -s src/Orders.Api</code></pre>
+
+    <h3>Run API</h3>
+    <pre><code class="language-bash">dotnet run --project src/Orders.Api</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Testing</h2>
+    <p>Weryfikację warto prowadzić na kilku poziomach: testy jednostkowe domeny, testy integracyjne API z Testcontainers i testy obciążeniowe.</p>
+
+    <h3>Przykładowe testy jednostkowe i integracyjne</h3>
+    <pre><code class="language-bash">dotnet test</code></pre>
+
+    <h3>Przykładowe scenariusze</h3>
+    <ul>
+      <li>Poprawne utworzenie zamówienia z kilkoma pozycjami.</li>
+      <li>Wysłanie tego samego requestu dwa razy z tym samym Idempotency-Key i oczekiwanie tego samego rezultatu.</li>
+      <li>Walidacja błędnego currency, pustych items i ujemnych wartości.</li>
+      <li>Test obciążeniowy z dużą liczbą równoległych POST i obserwacja czasu odpowiedzi oraz błędów 429.</li>
+    </ul>
+
+    <h3>Przykład żądania</h3>
+    <pre><code class="language-text">POST /api/orders
+Idempotency-Key: 8b4b5b8e-2f0f-4fcb-8b3d-0d9f2ec1a7f2
+
+{
+  "customerId": "11111111-1111-1111-1111-111111111111",
+  "currency": "PLN",
+  "items": [
+    {
+      "productId": "22222222-2222-2222-2222-222222222222",
+      "name": "Keyboard",
+      "unitPrice": 199.99,
+      "quantity": 1
+    }
+  ]
+}</code></pre>
+  </section>
+</div></div></div></article>

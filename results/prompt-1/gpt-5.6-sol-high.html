@@ -1,0 +1,65 @@
+\<article class="streaming-response">\<strong>Model:\</strong> \<u>gpt-5.6-sol-high\</u>\<p>\<strong>Execution time:\</strong> 16181 ms\</p>\<p>\<strong>Input tokens:\</strong> 1066\</p>\<p>\<strong>Output tokens:\</strong> 1124\</p>\<p>\<strong>Total tokens:\</strong> 2190\</p>\<p>\<strong>Question:\</strong> Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.\</p>\<div>\<p>\<strong>Answer:\</strong>\</p>\<div>\<div class="vertical-stack">
+\<section class="vertical-stack-item">
+\<h2>Opis rozwiązania\</h2>
+\<p>Prosta aplikacja konsolowa w C# korzystająca z najnowszej stabilnej wersji \<strong>.NET 10\</strong>. Po uruchomieniu program wypisuje tekst \<strong>Hello, World!\</strong> i kończy działanie.\</p>
+\</section>
+\<section class="vertical-stack-item">
+\<h2>Wymagania\</h2>
+\<ul>
+\<li>Środowisko \<strong>.NET 10 SDK\</strong>.\</li>
+\<li>Dowolny edytor kodu lub IDE, na przykład Visual Studio, Visual Studio Code albo JetBrains Rider.\</li>
+\</ul>
+\<p>Instalację SDK można sprawdzić poleceniem:\</p>
+\<pre>\<code class="language-bash">dotnet --version\</code>\</pre>
+\<p>Wynik powinien rozpoczynać się od \<code>10.\</code>.\</p>
+\</section>
+\<section class="vertical-stack-item">
+\<h2>Struktura projektu\</h2>
+\<pre>\<code class="language-text">HelloWorld/
+├── HelloWorld.csproj
+└── Program.cs\</code>\</pre>
+\</section>
+\<section class="vertical-stack-item">
+\<h2>Implementacja\</h2>
+\<h3>HelloWorld.csproj\</h3>
+\<p>Plik projektu definiuje aplikację wykonywalną, platformę docelową .NET 10 oraz włącza analizę typów nullable.\</p>
+\<pre>\<code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk"&gt;
+&#x20; &lt;PropertyGroup&gt;
+&#x20;   &lt;OutputType&gt;Exe&lt;/OutputType&gt;
+&#x20;   &lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;
+&#x20;   &lt;ImplicitUsings&gt;disable&lt;/ImplicitUsings&gt;
+&#x20;   &lt;Nullable&gt;enable&lt;/Nullable&gt;
+&#x20; &lt;/PropertyGroup&gt;
+&lt;/Project&gt;\</code>\</pre>
+\<h3>Program.cs\</h3>
+\<p>Plik zawiera punkt wejścia programu zapisany z użyciem współczesnych instrukcji najwyższego poziomu.\</p>
+\<pre>\<code class="language-csharp">using System;
+
+Console.WriteLine("Hello, World!");\</code>\</pre>
+\</section>
+\<section class="vertical-stack-item">
+\<h2>Utworzenie i uruchomienie\</h2>
+\<p>Projekt można utworzyć za pomocą narzędzia wiersza poleceń .NET:\</p>
+\<pre>\<code class="language-bash">dotnet new console --framework net10.0 --name HelloWorld
+cd HelloWorld
+dotnet run\</code>\</pre>
+\<p>Następnie należy zastąpić wygenerowane pliki przedstawioną wyżej zawartością. Jeśli pliki zostały utworzone ręcznie, wystarczy przejść do katalogu projektu i wykonać:\</p>
+\<pre>\<code class="language-bash">cd HelloWorld
+dotnet restore
+dotnet run\</code>\</pre>
+\<p>Oczekiwany wynik:\</p>
+\<pre>\<code class="language-text">Hello, World!\</code>\</pre>
+\</section>
+\<section class="vertical-stack-item">
+\<h2>Jak to działa\</h2>
+\<p>\<code>Console.WriteLine\</code> zapisuje przekazany tekst do standardowego wyjścia konsoli i dodaje znak końca wiersza. Instrukcje najwyższego poziomu pozwalają pominąć ręczne deklarowanie klasy oraz metody \<code>Main\</code>; kompilator generuje wymagany punkt wejścia aplikacji.\</p>
+\<p>Program nie przyjmuje danych wejściowych, nie korzysta z sieci, plików ani zewnętrznych pakietów, dlatego nie wymaga dodatkowej konfiguracji, walidacji ani mechanizmów bezpieczeństwa.\</p>
+\</section>
+\<section class="vertical-stack-item">
+\<h2>Weryfikacja\</h2>
+\<p>Aby osobno zbudować aplikację i uruchomić skompilowany plik, wykonaj:\</p>
+\<pre>\<code class="language-bash">dotnet build
+dotnet ./bin/Debug/net10.0/HelloWorld.dll\</code>\</pre>
+\<p>Poprawna kompilacja kończy się bez błędów, a aplikacja wypisuje \<code>Hello, World!\</code>.\</p>
+\</section>
+\</div>\</div>\</div>\</article>

@@ -1,0 +1,96 @@
+<article class="streaming-response"><strong>Model:</strong> <u>gpt-5.4-mini-low</u><p><strong>Execution time:</strong> 10966 ms</p><p><strong>Input tokens:</strong> 1152</p><p><strong>Output tokens:</strong> 1589</p><p><strong>Total tokens:</strong> 2741</p><p><strong>Question:</strong> Przeanalizuj poniższy kod C#. Znajdź błędy, problemy związane z async/await, obsługą wyjątków, wydajnością oraz jakością kodu. Zaproponuj tylko niezbędne poprawki bez niepotrzebnego przepisywania całej implementacji. Wyjaśnij każdą zaproponowaną zmianę.
+	
+	public async Task&lt;Product?&gt; GetProductAsync(int id)
+	{
+	    var product = _repository.GetById(id);
+	
+	    if (product == null)
+	    {
+	        throw new Exception("Product not found");
+	    }
+	
+	    return await Task.FromResult(product);
+	}</p><div><p><strong>Answer:</strong></p><div><div class="vertical-stack">
+  <section class="vertical-stack-item">
+    <h2>Analiza problemów i minimalne poprawki</h2>
+    <p>W pokazanym kodzie są trzy główne problemy: brak prawdziwej asynchroniczności, zbyt ogólna obsługa wyjątków oraz niepotrzebne użycie <em>async/await</em>. Poniżej znajduje się minimalna poprawka wraz z uzasadnieniem.</p>
+    <pre><code class="language-csharp">public Task&lt;Product?&gt; GetProductAsync(int id)
+{
+    var product = _repository.GetById(id);
+
+    if (product is null)
+    {
+        return Task.FromResult&lt;Product?&gt;(null);
+    }
+
+    return Task.FromResult&lt;Product?&gt;(product);
+}</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Co było nie tak</h2>
+    <ul>
+      <li><strong>Brak realnego asynchronicznego I/O.</strong> Metoda jest oznaczona jako <code>async</code>, ale nie zawiera żadnego rzeczywiście asynchronicznego wywołania.</li>
+      <li><strong>Niepotrzebny <code>await</code>.</strong> <code>await Task.FromResult(product)</code> nic nie daje, bo wynik jest dostępny natychmiast.</li>
+      <li><strong>Zły typ wyjątku.</strong> <code>throw new Exception("Product not found")</code> jest zbyt ogólne i utrudnia obsługę błędów na wyższych warstwach.</li>
+      <li><strong>Semantyka metody.</strong> Nazwa <code>GetProductAsync</code> sugeruje zwracanie produktu lub <code>null</code>; rzucanie wyjątku przy braku danych często nie jest najlepszym wyborem dla metody odczytującej.</li>
+      <li><strong>Potencjalny problem wydajnościowy.</strong> Jeśli repozytorium ma wersję synchroniczną, to metoda nie zyskuje nic z <code>async</code>, a jedynie dodaje narzut i utrudnia testowanie.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Dlaczego taka poprawka jest wystarczająca</h2>
+    <p>Jeżeli <code>_repository.GetById(id)</code> jest synchroniczne, to najbardziej sensowną minimalną zmianą jest usunięcie <code>async</code> i zwrócenie <code>Task.FromResult</code>. Dzięki temu:</p>
+    <ul>
+      <li>metoda nadal zachowuje publiczny kontrakt asynchroniczny,</li>
+      <li>unikamy zbędnego state machine generowanego przez <code>async/await</code>,</li>
+      <li>kod staje się prostszy i bardziej czytelny,</li>
+      <li>brak produktu jest reprezentowany naturalnie przez <code>null</code>, jeśli taki jest zamierzony kontrakt.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Jeśli brak produktu ma być błędem</h2>
+    <p>Jeżeli biznesowo brak produktu rzeczywiście powinien być traktowany jako wyjątek, to nadal warto nie używać ogólnego <code>Exception</code>. Minimalnie lepsze rozwiązanie to dedykowany wyjątek lub co najmniej <code>InvalidOperationException</code>.</p>
+    <pre><code class="language-csharp">public Task&lt;Product?&gt; GetProductAsync(int id)
+{
+    var product = _repository.GetById(id);
+
+    if (product is null)
+    {
+        throw new InvalidOperationException($"Product with id {id} was not found.");
+    }
+
+    return Task.FromResult&lt;Product?&gt;(product);
+}</code></pre>
+    <p>To podejście jest czytelniejsze, bo jasno komunikuje błąd stanu operacji, a nie ogólny problem techniczny.</p>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Rekomendowana wersja końcowa</h2>
+    <p>W typowym API odczytu lepszy jest wariant zwracający <code>null</code> dla braku danych. To najprostsza i najtańsza zmiana, która usuwa błędy związane z <em>async/await</em> i poprawia jakość kodu bez przepisywania całej implementacji.</p>
+    <pre><code class="language-csharp">public Task&lt;Product?&gt; GetProductAsync(int id)
+{
+    var product = _repository.GetById(id);
+
+    return Task.FromResult(product);
+}</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Wyjaśnienie każdej zmiany</h2>
+    <ul>
+      <li><strong>Usunięcie słowa kluczowego <code>async</code></strong> — metoda nie wykonuje żadnego <code>await</code>, więc oznaczenie jej jako <code>async</code> jest zbędne.</li>
+      <li><strong>Usunięcie <code>await</code></strong> — nie ma sensu czekać na już gotowy wynik opakowany w <code>Task.FromResult</code>.</li>
+      <li><strong>Usunięcie rzucania ogólnego wyjątku</strong> — brak produktu nie powinien być sygnalizowany przez <code>Exception</code>, bo utrudnia to obsługę i diagnostykę.</li>
+      <li><strong>Zwracanie <code>Task.FromResult(product)</code></strong> — zachowuje asynchroniczny kontrakt metody bez kosztu niepotrzebnego <code>async</code>.</li>
+      <li><strong>Użycie <code>product is null</code></strong> — to bardziej idiomatyczne i bezpieczne w nowoczesnym C# niż <code>product == null</code>.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Uwagi architektoniczne</h2>
+    <p>Jeżeli repozytorium ma prawdziwą wersję asynchroniczną, najlepszym rozwiązaniem byłoby przejście na nią, na przykład <code>await _repository.GetByIdAsync(id)</code>. Wtedy metoda powinna pozostać <code>async</code>. Ponieważ jednak w podanym kodzie tego nie widać, nie ma sensu wymuszać większego refaktoryzowania niż konieczne.</p>
+    <p>W skrócie: albo metoda jest naprawdę asynchroniczna, albo pozostaje synchroniczna ukryta za <code>Task</code>. Obecna wersja próbuje być asynchroniczna tylko z nazwy, co jest antywzorcem.</p>
+  </section>
+</div></div></div></article>

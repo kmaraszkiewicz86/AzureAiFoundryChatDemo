@@ -1,0 +1,314 @@
+\<article class="streaming-response">\<strong>Model:\</strong> \<u>gpt-5.4-mini-low\</u>\<p>\<strong>Execution time:\</strong> 18147 ms\</p>\<p>\<strong>Input tokens:\</strong> 1093\</p>\<p>\<strong>Output tokens:\</strong> 3475\</p>\<p>\<strong>Total tokens:\</strong> 4568\</p>\<p>\<strong>Question:\</strong> Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania.\</p>\<div>\<p>\<strong>Answer:\</strong>\</p>\<div>\<div class="vertical-stack">
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Solution overview\</h2>
+&#x20;   \<p>To rozwiązanie przedstawia proste REST API w ASP.NET Core do zarządzania listą produktów. API udostępnia endpointy \<strong>GET\</strong>, \<strong>POST\</strong> i \<strong>DELETE\</strong>, korzysta z \<strong>kontrolera\</strong>, \<strong>Dependency Injection\</strong>, \<strong>async/await\</strong> oraz \<strong>walidacji danych wejściowych\</strong>. Dane są przechowywane w pamięci, więc aplikacja nie wymaga bazy danych ani dodatkowej infrastruktury.\</p>
+&#x20;   \<p>Architektura jest celowo prosta, ale zgodna z dobrymi praktykami: warstwa API jest oddzielona od logiki biznesowej przez interfejs serwisu, a odpowiedzialność za przechowywanie danych w pamięci jest wydzielona do osobnej klasy. Dzięki temu kod jest łatwy do testowania, rozszerzania i późniejszej podmiany magazynu danych na bazę danych.\</p>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Prerequisites\</h2>
+&#x20;   \<ul>
+&#x20;     \<li>.NET 8 SDK\</li>
+&#x20;     \<li>ASP.NET Core Web API\</li>
+&#x20;     \<li>Dowolne narzędzie do testowania HTTP, np. Swagger UI, Postman lub curl\</li>
+&#x20;   \</ul>
+&#x20;   \<p>W tym przykładzie nie są potrzebne żadne dodatkowe paczki NuGet, ponieważ wykorzystujemy wyłącznie wbudowane funkcje ASP.NET Core.\</p>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Project structure\</h2>
+&#x20;   \<pre>\<code class="language-text">ProductApi/
+├── Controllers/
+│   └── ProductsController.cs
+├── Models/
+│   ├── Product.cs
+│   ├── ProductCreateRequest.cs
+│   └── ProductResponse.cs
+├── Services/
+│   ├── IProductService.cs
+│   └── InMemoryProductService.cs
+├── Program.cs
+└── ProductApi.csproj\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Implementation\</h2>
+
+&#x20;   \<h3>ProductApi.csproj\</h3>
+&#x20;   \<p>Plik projektu definiuje aplikację webową opartą o .NET 8 i nie wymaga dodatkowych zależności.\</p>
+&#x20;   \<pre>\<code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+&#x20; &lt;PropertyGroup&gt;
+&#x20;   &lt;TargetFramework&gt;net8.0&lt;/TargetFramework&gt;
+&#x20;   &lt;Nullable&gt;enable&lt;/Nullable&gt;
+&#x20;   &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+&#x20;   &lt;TreatWarningsAsErrors&gt;true&lt;/TreatWarningsAsErrors&gt;
+&#x20; &lt;/PropertyGroup&gt;
+&lt;/Project&gt;\</code>\</pre>
+
+&#x20;   \<h3>Program.cs\</h3>
+&#x20;   \<p>Punkt startowy aplikacji rejestruje kontrolery, usługę produktów w DI oraz Swagger do wygodnego testowania endpointów.\</p>
+&#x20;   \<pre>\<code class="language-csharp">using ProductApi.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddSingleton&lt;IProductService, InMemoryProductService&gt;();
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+&#x20;   app.UseSwagger();
+&#x20;   app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.MapControllers();
+
+app.Run();\</code>\</pre>
+
+&#x20;   \<h3>Models/Product.cs\</h3>
+&#x20;   \<p>Model domenowy reprezentuje produkt przechowywany w pamięci. Zawiera identyfikator, nazwę, cenę oraz datę utworzenia.\</p>
+&#x20;   \<pre>\<code class="language-csharp">namespace ProductApi.Models;
+
+public sealed record Product(
+&#x20;   Guid Id,
+&#x20;   string Name,
+&#x20;   decimal Price,
+&#x20;   DateTime CreatedAtUtc);\</code>\</pre>
+
+&#x20;   \<h3>Models/ProductCreateRequest.cs\</h3>
+&#x20;   \<p>Model żądania dla endpointu POST wykorzystuje atrybuty walidacyjne, aby kontroler automatycznie odrzucał niepoprawne dane.\</p>
+&#x20;   \<pre>\<code class="language-csharp">using System.ComponentModel.DataAnnotations;
+
+namespace ProductApi.Models;
+
+public sealed class ProductCreateRequest
+{
+&#x20;   [Required]
+&#x20;   [StringLength(100, MinimumLength = 2)]
+&#x20;   public string Name { get; init; } = string.Empty;
+
+&#x20;   [Range(typeof(decimal), "0.01", "999999999.99")]
+&#x20;   public decimal Price { get; init; }
+}\</code>\</pre>
+
+&#x20;   \<h3>Models/ProductResponse.cs\</h3>
+&#x20;   \<p>Model odpowiedzi pozwala oddzielić kontrakt API od wewnętrznego modelu danych i zwraca spójny format odpowiedzi.\</p>
+&#x20;   \<pre>\<code class="language-csharp">namespace ProductApi.Models;
+
+public sealed record ProductResponse(
+&#x20;   Guid Id,
+&#x20;   string Name,
+&#x20;   decimal Price,
+&#x20;   DateTime CreatedAtUtc);\</code>\</pre>
+
+&#x20;   \<h3>Services/IProductService.cs\</h3>
+&#x20;   \<p>Interfejs serwisu definiuje kontrakt dla operacji na produktach i umożliwia łatwą podmianę implementacji w przyszłości.\</p>
+&#x20;   \<pre>\<code class="language-csharp">using ProductApi.Models;
+
+namespace ProductApi.Services;
+
+public interface IProductService
+{
+&#x20;   Task&lt;IReadOnlyCollection&lt;Product&gt;&gt; GetAllAsync(CancellationToken cancellationToken);
+&#x20;   Task&lt;Product?&gt; GetByIdAsync(Guid id, CancellationToken cancellationToken);
+&#x20;   Task&lt;Product&gt; CreateAsync(string name, decimal price, CancellationToken cancellationToken);
+&#x20;   Task&lt;bool&gt; DeleteAsync(Guid id, CancellationToken cancellationToken);
+}\</code>\</pre>
+
+&#x20;   \<h3>Services/InMemoryProductService.cs\</h3>
+&#x20;   \<p>Implementacja przechowuje dane w pamięci i używa synchronizacji, aby była bezpieczna przy równoległych żądaniach. Metody są asynchroniczne zgodnie z wymaganiem, chociaż operacje in-memory są natychmiastowe.\</p>
+&#x20;   \<pre>\<code class="language-csharp">using System.Collections.Concurrent;
+using ProductApi.Models;
+
+namespace ProductApi.Services;
+
+public sealed class InMemoryProductService : IProductService
+{
+&#x20;   private readonly ConcurrentDictionary&lt;Guid, Product&gt; \_products = new();
+
+&#x20;   public InMemoryProductService()
+&#x20;   {
+&#x20;       var seed1 = new Product(Guid.NewGuid(), "Laptop", 4499.99m, DateTime.UtcNow);
+&#x20;       var seed2 = new Product(Guid.NewGuid(), "Mysz", 99.90m, DateTime.UtcNow);
+&#x20;       \_products[seed1.Id] = seed1;
+&#x20;       \_products[seed2.Id] = seed2;
+&#x20;   }
+
+&#x20;   public Task&lt;IReadOnlyCollection&lt;Product&gt;&gt; GetAllAsync(CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       cancellationToken.ThrowIfCancellationRequested();
+&#x20;       IReadOnlyCollection&lt;Product&gt; result = \_products.Values
+&#x20;           .OrderBy(p =&gt; p.Name)
+&#x20;           .ToArray();
+
+&#x20;       return Task.FromResult(result);
+&#x20;   }
+
+&#x20;   public Task&lt;Product?&gt; GetByIdAsync(Guid id, CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       cancellationToken.ThrowIfCancellationRequested();
+&#x20;       \_products.TryGetValue(id, out var product);
+&#x20;       return Task.FromResult(product);
+&#x20;   }
+
+&#x20;   public Task&lt;Product&gt; CreateAsync(string name, decimal price, CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       cancellationToken.ThrowIfCancellationRequested();
+
+&#x20;       var product = new Product(
+&#x20;           Guid.NewGuid(),
+&#x20;           name.Trim(),
+&#x20;           price,
+&#x20;           DateTime.UtcNow);
+
+&#x20;       \_products[product.Id] = product;
+&#x20;       return Task.FromResult(product);
+&#x20;   }
+
+&#x20;   public Task&lt;bool&gt; DeleteAsync(Guid id, CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       cancellationToken.ThrowIfCancellationRequested();
+&#x20;       var removed = \_products.TryRemove(id, out \_);
+&#x20;       return Task.FromResult(removed);
+&#x20;   }
+}\</code>\</pre>
+
+&#x20;   \<h3>Controllers/ProductsController.cs\</h3>
+&#x20;   \<p>Kontroler wystawia endpointy REST: pobieranie listy produktów, dodawanie produktu i usuwanie po identyfikatorze. Walidacja modelu wejściowego odbywa się automatycznie dzięki \<strong>[ApiController]\</strong>.\</p>
+&#x20;   \<pre>\<code class="language-csharp">using Microsoft.AspNetCore.Mvc;
+using ProductApi.Models;
+using ProductApi.Services;
+
+namespace ProductApi.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public sealed class ProductsController : ControllerBase
+{
+&#x20;   private readonly IProductService \_productService;
+
+&#x20;   public ProductsController(IProductService productService)
+&#x20;   {
+&#x20;       \_productService = productService;
+&#x20;   }
+
+&#x20;   [HttpGet]
+&#x20;   [ProducesResponseType(typeof(IReadOnlyCollection&lt;ProductResponse&gt;), StatusCodes.Status200OK)]
+&#x20;   public async Task&lt;ActionResult&lt;IReadOnlyCollection&lt;ProductResponse&gt;&gt;&gt; GetAllAsync(CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       var products = await \_productService.GetAllAsync(cancellationToken);
+
+&#x20;       var response = products
+&#x20;           .Select(MapToResponse)
+&#x20;           .ToArray();
+
+&#x20;       return Ok(response);
+&#x20;   }
+
+&#x20;   [HttpGet("{id:guid}")]
+&#x20;   [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
+&#x20;   [ProducesResponseType(StatusCodes.Status404NotFound)]
+&#x20;   public async Task&lt;ActionResult&lt;ProductResponse&gt;&gt; GetByIdAsync(Guid id, CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       var product = await \_productService.GetByIdAsync(id, cancellationToken);
+
+&#x20;       if (product is null)
+&#x20;       {
+&#x20;           return NotFound();
+&#x20;       }
+
+&#x20;       return Ok(MapToResponse(product));
+&#x20;   }
+
+&#x20;   [HttpPost]
+&#x20;   [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status201Created)]
+&#x20;   [ProducesResponseType(StatusCodes.Status400BadRequest)]
+&#x20;   public async Task&lt;ActionResult&lt;ProductResponse&gt;&gt; CreateAsync([FromBody] ProductCreateRequest request, CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       var product = await \_productService.CreateAsync(request.Name, request.Price, cancellationToken);
+&#x20;       var response = MapToResponse(product);
+
+&#x20;       return CreatedAtAction(nameof(GetByIdAsync), new { id = response.Id }, response);
+&#x20;   }
+
+&#x20;   [HttpDelete("{id:guid}")]
+&#x20;   [ProducesResponseType(StatusCodes.Status204NoContent)]
+&#x20;   [ProducesResponseType(StatusCodes.Status404NotFound)]
+&#x20;   public async Task&lt;IActionResult&gt; DeleteAsync(Guid id, CancellationToken cancellationToken)
+&#x20;   {
+&#x20;       var removed = await \_productService.DeleteAsync(id, cancellationToken);
+
+&#x20;       if (!removed)
+&#x20;       {
+&#x20;           return NotFound();
+&#x20;       }
+
+&#x20;       return NoContent();
+&#x20;   }
+
+&#x20;   private static ProductResponse MapToResponse(Product product)
+&#x20;       \=&gt; new(product.Id, product.Name, product.Price, product.CreatedAtUtc);
+}\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Configuration\</h2>
+&#x20;   \<p>Nie jest wymagany osobny plik konfiguracji poza standardowym \<strong>Program.cs\</strong>. Jeśli chcesz uruchamiać aplikację w środowisku deweloperskim z Swagger UI, wystarczy domyślne ustawienie \<strong>ASPNETCORE\_ENVIRONMENT=Development\</strong>.\</p>
+&#x20;   \<p>Opcjonalnie można użyć pliku \<strong>launchSettings.json\</strong> w celu ustawienia portów i profilu uruchomieniowego. Poniżej przykładowa konfiguracja:\</p>
+&#x20;   \<h3>Properties/launchSettings.json\</h3>
+&#x20;   \<pre>\<code class="language-json">{
+&#x20; "profiles": {
+&#x20;   "ProductApi": {
+&#x20;     "commandName": "Project",
+&#x20;     "dotnetRunMessages": true,
+&#x20;     "launchBrowser": true,
+&#x20;     "applicationUrl": "https\://localhost:7081;http\://localhost:5081",
+&#x20;     "environmentVariables": {
+&#x20;       "ASPNETCORE\_ENVIRONMENT": "Development"
+&#x20;     }
+&#x20;   }
+&#x20; }
+}\</code>\</pre>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Build and run\</h2>
+&#x20;   \<pre>\<code class="language-bash">dotnet restore
+dotnet build
+dotnet run\</code>\</pre>
+&#x20;   \<p>Po uruchomieniu aplikacja będzie dostępna pod adresami wskazanymi w konfiguracji uruchomieniowej. W trybie Development Swagger UI będzie dostępny automatycznie.\</p>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>How it works\</h2>
+&#x20;   \<p>Żądanie HTTP trafia do \<strong>ProductsController\</strong>, który używa wstrzykniętego przez DI \<strong>IProductService\</strong>. Kontroler nie zna szczegółów przechowywania danych, dzięki czemu jest prosty i zgodny z zasadą pojedynczej odpowiedzialności.\</p>
+&#x20;   \<p>Endpoint \<strong>GET /api/products\</strong> zwraca wszystkie produkty, \<strong>GET /api/products/{id}\</strong> pobiera pojedynczy produkt, \<strong>POST /api/products\</strong> tworzy nowy rekord, a \<strong>DELETE /api/products/{id}\</strong> usuwa produkt. W przypadku braku elementu zwracany jest status \<strong>404 Not Found\</strong>.\</p>
+&#x20;   \<p>Walidacja wejścia działa na dwóch poziomach: atrybuty danych w \<strong>ProductCreateRequest\</strong> sprawdzają poprawność modelu, a atrybut \<strong>[ApiController]\</strong> automatycznie zwraca \<strong>400 Bad Request\</strong> dla niepoprawnego payloadu. Użycie \<strong>async/await\</strong> i tokenów anulowania zachowuje spójność z nowoczesnym stylem ASP.NET Core, nawet jeśli magazyn danych działa w pamięci.\</p>
+&#x20;   \<p>Zastosowanie \<strong>ConcurrentDictionary\</strong> zwiększa bezpieczeństwo współbieżne przy wielu równoczesnych żądaniach. Dzięki temu aplikacja jest gotowa do lokalnego użycia i stanowi dobrą bazę pod późniejsze rozszerzenie o trwałe składowanie danych.\</p>
+&#x20; \</section>
+
+&#x20; \<section class="vertical-stack-item">
+&#x20;   \<h2>Testing\</h2>
+&#x20;   \<p>Najprościej przetestować API przez Swagger UI lub curl. Poniżej przykładowe polecenia:\</p>
+&#x20;   \<pre>\<code class="language-bash">curl [https://localhost:7081/api/products](https://localhost:7081/api/products) -k
+
+curl [https://localhost:7081/api/products](https://localhost:7081/api/products) \\
+&#x20; -k \\
+&#x20; -H "Content-Type: application/json" \\
+&#x20; -d "{\\"name\\":\\"Klawiatura\\",\\"price\\":249.99}"
+
+curl -X DELETE [https://localhost:7081/api/products/{id](https://localhost:7081/api/products/{id)} -k\</code>\</pre>
+&#x20;   \<p>Weryfikacja poprawności powinna obejmować:\</p>
+&#x20;   \<ul>
+&#x20;     \<li>otrzymanie listy produktów dla \<strong>GET\</strong>\</li>
+&#x20;     \<li>utworzenie produktu i zwrot \<strong>201 Created\</strong> dla \<strong>POST\</strong>\</li>
+&#x20;     \<li>odrzucenie pustej lub niepoprawnej nazwy oraz nieprawidłowej ceny\</li>
+&#x20;     \<li>zwrócenie \<strong>204 No Content\</strong> po poprawnym usunięciu\</li>
+&#x20;     \<li>zwrócenie \<strong>404 Not Found\</strong> przy próbie usunięcia lub pobrania nieistniejącego produktu\</li>
+&#x20;   \</ul>
+&#x20; \</section>
+\</div>\</div>\</div>\</article>

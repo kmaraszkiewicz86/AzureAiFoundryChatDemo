@@ -1,0 +1,160 @@
+<article class="streaming-response"><strong>Model:</strong> <u>gpt-5.6-terra-medium</u><p><strong>Execution time:</strong> 24513 ms</p><p><strong>Input tokens:</strong> 1152</p><p><strong>Output tokens:</strong> 2446</p><p><strong>Total tokens:</strong> 3598</p><p><strong>Question:</strong> Przeanalizuj poniższy kod C#. Znajdź błędy, problemy związane z async/await, obsługą wyjątków, wydajnością oraz jakością kodu. Zaproponuj tylko niezbędne poprawki bez niepotrzebnego przepisywania całej implementacji. Wyjaśnij każdą zaproponowaną zmianę.
+	
+	public async Task&lt;Product?&gt; GetProductAsync(int id)
+	{
+	    var product = _repository.GetById(id);
+	
+	    if (product == null)
+	    {
+	        throw new Exception("Product not found");
+	    }
+	
+	    return await Task.FromResult(product);
+	}</p><div><p><strong>Answer:</strong></p><div><div class="vertical-stack">
+  <section class="vertical-stack-item">
+    <h2>Najważniejsze problemy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Obszar</th>
+          <th>Problem</th>
+          <th>Skutek</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>async/await</td>
+          <td>Metoda jest oznaczona jako <code>async</code>, ale nie wykonuje rzeczywistej operacji asynchronicznej.</td>
+          <td>Powstaje niepotrzebna maszyna stanów generowana przez kompilator.</td>
+        </tr>
+        <tr>
+          <td>Task.FromResult</td>
+          <td><code>Task.FromResult(product)</code> opakowuje już pobrany, synchroniczny wynik w ukończone zadanie.</td>
+          <td>Nie daje asynchroniczności ani korzyści wydajnościowej.</td>
+        </tr>
+        <tr>
+          <td>Wydajność</td>
+          <td><code>_repository.GetById(id)</code> jest metodą synchroniczną.</td>
+          <td>Jeżeli repozytorium wykonuje I/O, np. zapytanie do bazy danych, może blokować wątek obsługujący żądanie.</td>
+        </tr>
+        <tr>
+          <td>Obsługa wyjątków</td>
+          <td>Rzucany jest ogólny <code>Exception</code>.</td>
+          <td>Wywołujący nie może sensownie odróżnić braku produktu od błędu technicznego.</td>
+        </tr>
+        <tr>
+          <td>Nullability</td>
+          <td>Typ zwracany to <code>Task&lt;Product?&gt;</code>, chociaż metoda dla <code>null</code> rzuca wyjątek.</td>
+          <td>Kontrakt metody jest niespójny: wynik nigdy nie powinien być <code>null</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Minimalna poprawka dla synchronicznego repozytorium</h2>
+    <p>Jeżeli <code>GetById</code> jest świadomie synchroniczne i nie wykonuje blokującego I/O, metoda również powinna być synchroniczna. Jest to najprostsza i najbardziej spójna poprawka.</p>
+
+    <h3>GetProduct</h3>
+    <pre><code class="language-csharp">public Product GetProduct(int id)
+{
+    var product = _repository.GetById(id);
+
+    if (product is null)
+    {
+        throw new KeyNotFoundException("Product not found.");
+    }
+
+    return product;
+}</code></pre>
+
+    <ul>
+      <li>Usunięto <code>async</code>, ponieważ metoda nie oczekuje na żadną operację.</li>
+      <li>Usunięto <code>Task.FromResult</code>, ponieważ niepotrzebnie tworzył ukończone zadanie.</li>
+      <li>Zmieniono wynik na <code>Product</code>, ponieważ po udanym zakończeniu metody produkt jest zawsze dostępny.</li>
+      <li>Zastąpiono ogólny <code>Exception</code> bardziej znaczącym <code>KeyNotFoundException</code>.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Wariant zachowujący asynchroniczne API</h2>
+    <p>Jeżeli sygnatura <code>GetProductAsync</code> musi pozostać asynchroniczna z powodu istniejącego kontraktu, a repozytorium nadal jest synchroniczne, można usunąć wyłącznie zbędne <code>async</code> i <code>await</code>.</p>
+
+    <h3>GetProductAsync</h3>
+    <pre><code class="language-csharp">public Task&lt;Product&gt; GetProductAsync(int id)
+{
+    var product = _repository.GetById(id);
+
+    if (product is null)
+    {
+        return Task.FromException&lt;Product&gt;(
+            new KeyNotFoundException("Product not found."));
+    }
+
+    return Task.FromResult(product);
+}</code></pre>
+
+    <p>Ten wariant zachowuje charakter metody zwracającej <code>Task</code>, w tym przekazanie błędu jako uszkodzonego zadania. Nie rozwiązuje jednak problemu blokowania wątku przez synchroniczne repozytorium.</p>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Docelowa poprawka dla repozytorium wykonującego I/O</h2>
+    <p>Jeżeli pobranie produktu używa bazy danych, HTTP, pliku lub innego I/O, właściwym rozwiązaniem jest asynchroniczność od warstwy repozytorium. Nie należy używać <code>Task.Run</code> do opakowania synchronicznego dostępu do bazy, ponieważ jedynie przenosi blokowanie na wątek puli wątków.</p>
+
+    <h3>IProductRepository.cs</h3>
+    <pre><code class="language-csharp">using System.Threading;
+using System.Threading.Tasks;
+
+public interface IProductRepository
+{
+    Task&lt;Product?&gt; GetByIdAsync(int id, CancellationToken cancellationToken = default);
+}</code></pre>
+
+    <h3>ProductService.cs</h3>
+    <pre><code class="language-csharp">using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+public async Task&lt;Product&gt; GetProductAsync(
+    int id,
+    CancellationToken cancellationToken = default)
+{
+    var product = await _repository
+        .GetByIdAsync(id, cancellationToken)
+        .ConfigureAwait(false);
+
+    if (product is null)
+    {
+        throw new KeyNotFoundException("Product not found.");
+    }
+
+    return product;
+}</code></pre>
+
+    <ul>
+      <li><code>GetByIdAsync</code> umożliwia nieblokujące oczekiwanie na I/O, pod warunkiem że implementacja repozytorium używa asynchronicznego API, np. <code>FindAsync</code>, <code>SingleOrDefaultAsync</code> lub asynchronicznego klienta HTTP.</li>
+      <li><code>CancellationToken</code> pozwala przerwać operację po anulowaniu żądania lub przekroczeniu limitu czasu.</li>
+      <li><code>ConfigureAwait(false)</code> jest bezpieczne i przydatne w kodzie bibliotecznym; w ASP.NET Core nie jest wymagane, ale nie szkodzi.</li>
+      <li>Typ wyniku pozostaje <code>Task&lt;Product&gt;</code>, bo brak produktu jest reprezentowany wyjątkiem, a nie wartością <code>null</code>.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Obsługa wyjątku</h2>
+    <p>Nie należy dodawać lokalnego <code>try/catch</code> tylko po to, aby ponownie rzucić ten sam wyjątek. Taki kod nie wnosi wartości i może prowadzić do utraty szczegółów stosu wywołań, jeśli użyto by <code>throw ex;</code>.</p>
+    <p>Warstwa HTTP, np. kontroler lub centralny middleware obsługi wyjątków, powinna mapować <code>KeyNotFoundException</code> na odpowiedź HTTP 404. Dzięki temu warstwa aplikacyjna pozostaje niezależna od HTTP.</p>
+    <blockquote>
+      <p>Jeżeli brak produktu jest normalnym scenariuszem biznesowym, alternatywą jest zwracanie <code>Product?</code> bez rzucania wyjątku. Nie należy jednak jednocześnie deklarować wartości nullable i rzucać wyjątku dla <code>null</code>.</p>
+    </blockquote>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Rekomendacja</h2>
+    <p>Najmniejsza właściwa zmiana zależy od charakteru repozytorium:</p>
+    <ol>
+      <li>Gdy repozytorium jest synchroniczne: zastosować wariant <code>GetProduct</code> bez <code>Task</code> i bez <code>async</code>.</li>
+      <li>Gdy repozytorium wykonuje I/O: dodać prawdziwe <code>GetByIdAsync</code> w repozytorium i użyć wariantu asynchronicznego z <code>CancellationToken</code>.</li>
+      <li>W obu przypadkach: zastąpić <code>Exception</code> konkretnym wyjątkiem oraz zmienić <code>Product?</code> na <code>Product</code>, jeśli brak produktu jest sygnalizowany wyjątkiem.</li>
+    </ol>
+  </section>
+</div></div></div></article>

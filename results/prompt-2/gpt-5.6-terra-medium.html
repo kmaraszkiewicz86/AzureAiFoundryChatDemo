@@ -1,0 +1,381 @@
+<article class="streaming-response"><strong>Model:</strong> <u>gpt-5.6-terra-medium</u><p><strong>Execution time:</strong> 45542 ms</p><p><strong>Input tokens:</strong> 1093</p><p><strong>Output tokens:</strong> 5051</p><p><strong>Total tokens:</strong> 6144</p><p><strong>Question:</strong> Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania.</p><div><p><strong>Answer:</strong></p><div><div class="vertical-stack">
+  <section class="vertical-stack-item">
+    <h2>Przegląd rozwiązania</h2>
+    <p>Rozwiązanie to proste REST API w ASP.NET Core 10 do zarządzania produktami przechowywanymi w pamięci procesu. API udostępnia endpointy do pobierania produktów, dodawania produktu oraz usuwania produktu.</p>
+    <p>Warstwa kontrolera obsługuje HTTP, repozytorium odpowiada za przechowywanie danych, a Dependency Injection dostarcza implementację repozytorium do kontrolera. Operacje API używają asynchronicznego kontraktu <code>Task</code> oraz <code>await</code>.</p>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Wymagania</h2>
+    <ul>
+      <li>.NET SDK 10.0 lub nowszy.</li>
+      <li>Dowolny edytor, np. Visual Studio 2022, Rider lub Visual Studio Code.</li>
+      <li>Brak zewnętrznych pakietów NuGet — wykorzystano wyłącznie ASP.NET Core.</li>
+    </ul>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Struktura projektu</h2>
+    <pre><code class="language-text">ProductApi/
+├── Controllers/
+│   └── ProductsController.cs
+├── Contracts/
+│   └── CreateProductRequest.cs
+├── Models/
+│   └── Product.cs
+├── Repositories/
+│   ├── IProductRepository.cs
+│   └── InMemoryProductRepository.cs
+├── Properties/
+│   └── launchSettings.json
+├── ProductApi.csproj
+└── Program.cs</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Implementacja</h2>
+
+    <h3>ProductApi.csproj</h3>
+    <p>Plik projektu ASP.NET Core, skonfigurowany dla .NET 10.</p>
+    <pre><code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
+  &lt;PropertyGroup&gt;
+    &lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;
+    &lt;Nullable&gt;enable&lt;/Nullable&gt;
+    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
+  &lt;/PropertyGroup&gt;
+&lt;/Project&gt;</code></pre>
+
+    <h3>Program.cs</h3>
+    <p>Konfiguruje kontener Dependency Injection, rejestruje kontrolery oraz mapuje endpointy API.</p>
+    <pre><code class="language-csharp">using ProductApi.Repositories;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddControllers();
+
+builder.Services.AddSingleton&lt;IProductRepository, InMemoryProductRepository&gt;();
+
+var app = builder.Build();
+
+app.UseHttpsRedirection();
+
+app.MapControllers();
+
+app.Run();</code></pre>
+
+    <h3>Models/Product.cs</h3>
+    <p>Model domenowy reprezentujący produkt zwracany przez API.</p>
+    <pre><code class="language-csharp">namespace ProductApi.Models;
+
+public sealed record Product(
+    Guid Id,
+    string Name,
+    decimal Price,
+    int Quantity,
+    DateTimeOffset CreatedAtUtc);</code></pre>
+
+    <h3>Contracts/CreateProductRequest.cs</h3>
+    <p>Model danych wejściowych dla endpointu POST. Atrybuty Data Annotations oraz walidacja własna zabezpieczają API przed niepoprawnymi wartościami.</p>
+    <pre><code class="language-csharp">using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+
+namespace ProductApi.Contracts;
+
+public sealed class CreateProductRequest : IValidatableObject
+{
+    [Required(AllowEmptyStrings = false)]
+    [StringLength(120)]
+    public string? Name { get; init; }
+
+    [Range(typeof(decimal), "0.01", "1000000")]
+    public decimal Price { get; init; }
+
+    [Range(0, 1000000)]
+    public int Quantity { get; init; }
+
+    public IEnumerable&lt;ValidationResult&gt; Validate(ValidationContext validationContext)
+    {
+        if (string.IsNullOrWhiteSpace(Name))
+        {
+            yield return new ValidationResult(
+                "Nazwa produktu nie może składać się wyłącznie z białych znaków.",
+                new[] { nameof(Name) });
+        }
+    }
+}</code></pre>
+
+    <h3>Repositories/IProductRepository.cs</h3>
+    <p>Abstrakcja warstwy dostępu do danych. Dzięki interfejsowi implementację pamięciową można później zastąpić np. bazą danych.</p>
+    <pre><code class="language-csharp">using ProductApi.Models;
+
+namespace ProductApi.Repositories;
+
+public interface IProductRepository
+{
+    Task&lt;IReadOnlyCollection&lt;Product&gt;&gt; GetAllAsync(CancellationToken cancellationToken);
+
+    Task&lt;Product?&gt; GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task&lt;Product&gt; AddAsync(
+        string name,
+        decimal price,
+        int quantity,
+        CancellationToken cancellationToken);
+
+    Task&lt;bool&gt; DeleteAsync(Guid id, CancellationToken cancellationToken);
+}</code></pre>
+
+    <h3>Repositories/InMemoryProductRepository.cs</h3>
+    <p>Implementacja repozytorium oparta o <code>ConcurrentDictionary</code>. Kolekcja jest bezpieczna dla współbieżnych żądań HTTP i żyje do czasu zatrzymania aplikacji.</p>
+    <pre><code class="language-csharp">using System.Collections.Concurrent;
+using System.Linq;
+using ProductApi.Models;
+
+namespace ProductApi.Repositories;
+
+public sealed class InMemoryProductRepository : IProductRepository
+{
+    private readonly ConcurrentDictionary&lt;Guid, Product&gt; _products = new();
+
+    public Task&lt;IReadOnlyCollection&lt;Product&gt;&gt; GetAllAsync(
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyCollection&lt;Product&gt; products = _products.Values
+            .OrderBy(product =&gt; product.CreatedAtUtc)
+            .ToArray();
+
+        return Task.FromResult(products);
+    }
+
+    public Task&lt;Product?&gt; GetByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _products.TryGetValue(id, out var product);
+
+        return Task.FromResult(product);
+    }
+
+    public Task&lt;Product&gt; AddAsync(
+        string name,
+        decimal price,
+        int quantity,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        Product product;
+
+        do
+        {
+            product = new Product(
+                Guid.NewGuid(),
+                name,
+                price,
+                quantity,
+                DateTimeOffset.UtcNow);
+        }
+        while (!_products.TryAdd(product.Id, product));
+
+        return Task.FromResult(product);
+    }
+
+    public Task&lt;bool&gt; DeleteAsync(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var removed = _products.TryRemove(id, out _);
+
+        return Task.FromResult(removed);
+    }
+}</code></pre>
+
+    <h3>Controllers/ProductsController.cs</h3>
+    <p>Kontroler definiuje endpointy REST pod adresem <code>/api/products</code>. Atrybut <code>ApiController</code> automatycznie zwraca odpowiedź 400 Bad Request, gdy walidacja modelu wejściowego zakończy się błędem.</p>
+    <pre><code class="language-csharp">using Microsoft.AspNetCore.Mvc;
+using ProductApi.Contracts;
+using ProductApi.Models;
+using ProductApi.Repositories;
+
+namespace ProductApi.Controllers;
+
+[ApiController]
+[Route("api/products")]
+[Produces("application/json")]
+public sealed class ProductsController : ControllerBase
+{
+    private readonly IProductRepository _productRepository;
+
+    public ProductsController(IProductRepository productRepository)
+    {
+        _productRepository = productRepository;
+    }
+
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyCollection&lt;Product&gt;), StatusCodes.Status200OK)]
+    public async Task&lt;ActionResult&lt;IReadOnlyCollection&lt;Product&gt;&gt;&gt; GetAll(
+        CancellationToken cancellationToken)
+    {
+        var products = await _productRepository.GetAllAsync(cancellationToken);
+
+        return Ok(products);
+    }
+
+    [HttpGet("{id:guid}")]
+    [ProducesResponseType(typeof(Product), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task&lt;ActionResult&lt;Product&gt;&gt; GetById(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var product = await _productRepository.GetByIdAsync(id, cancellationToken);
+
+        return product is null ? NotFound() : Ok(product);
+    }
+
+    [HttpPost]
+    [ProducesResponseType(typeof(Product), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task&lt;ActionResult&lt;Product&gt;&gt; Create(
+        [FromBody] CreateProductRequest request,
+        CancellationToken cancellationToken)
+    {
+        var product = await _productRepository.AddAsync(
+            request.Name!.Trim(),
+            request.Price,
+            request.Quantity,
+            cancellationToken);
+
+        return CreatedAtAction(
+            nameof(GetById),
+            new { id = product.Id },
+            product);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task&lt;IActionResult&gt; Delete(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var deleted = await _productRepository.DeleteAsync(id, cancellationToken);
+
+        return deleted ? NoContent() : NotFound();
+    }
+}</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Konfiguracja uruchomieniowa</h2>
+
+    <h3>Properties/launchSettings.json</h3>
+    <p>Opcjonalny profil lokalny definiujący adresy HTTP i HTTPS używane podczas uruchomienia w środowisku deweloperskim.</p>
+    <pre><code class="language-json">{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "ProductApi": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:7050;http://localhost:5050",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}</code></pre>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Endpointy</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Metoda</th>
+          <th>Adres</th>
+          <th>Opis</th>
+          <th>Odpowiedzi</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>GET</td>
+          <td>/api/products</td>
+          <td>Zwraca wszystkie produkty.</td>
+          <td>200 OK</td>
+        </tr>
+        <tr>
+          <td>GET</td>
+          <td>/api/products/{id}</td>
+          <td>Zwraca pojedynczy produkt według identyfikatora.</td>
+          <td>200 OK, 404 Not Found</td>
+        </tr>
+        <tr>
+          <td>POST</td>
+          <td>/api/products</td>
+          <td>Tworzy produkt na podstawie danych JSON.</td>
+          <td>201 Created, 400 Bad Request</td>
+        </tr>
+        <tr>
+          <td>DELETE</td>
+          <td>/api/products/{id}</td>
+          <td>Usuwa produkt o wskazanym identyfikatorze.</td>
+          <td>204 No Content, 404 Not Found</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Budowanie i uruchamianie</h2>
+    <pre><code class="language-bash">dotnet restore
+dotnet build
+dotnet run --launch-profile ProductApi</code></pre>
+    <p>Po uruchomieniu API będzie dostępne pod adresem <code>https://localhost:7050</code>. W środowisku lokalnym certyfikat deweloperski może wymagać zaufania przez polecenie <code>dotnet dev-certs https --trust</code>.</p>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Testowanie API</h2>
+
+    <h3>Pobranie pustej listy produktów</h3>
+    <pre><code class="language-bash">curl -k https://localhost:7050/api/products</code></pre>
+
+    <h3>Dodanie produktu</h3>
+    <pre><code class="language-bash">curl -k -i -X POST https://localhost:7050/api/products \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"Klawiatura mechaniczna\",\"price\":349.99,\"quantity\":10}"</code></pre>
+
+    <h3>Pobranie listy po dodaniu produktu</h3>
+    <pre><code class="language-bash">curl -k https://localhost:7050/api/products</code></pre>
+
+    <h3>Usunięcie produktu</h3>
+    <p>Należy skopiować identyfikator <code>id</code> z odpowiedzi POST lub GET.</p>
+    <pre><code class="language-bash">curl -k -i -X DELETE https://localhost:7050/api/products/TUTAJ_WSTAW_ID_PRODUKTU</code></pre>
+
+    <h3>Przykład błędnych danych</h3>
+    <pre><code class="language-bash">curl -k -i -X POST https://localhost:7050/api/products \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"   \",\"price\":0,\"quantity\":-1}"</code></pre>
+    <p>Żądanie zwróci <code>400 Bad Request</code> wraz ze szczegółami błędów walidacji w formacie Problem Details.</p>
+  </section>
+
+  <section class="vertical-stack-item">
+    <h2>Decyzje architektoniczne i bezpieczeństwo</h2>
+    <ul>
+      <li><strong>Kontrolery:</strong> logika HTTP pozostaje w <code>ProductsController</code>, co ułatwia rozwój API i testowanie.</li>
+      <li><strong>Dependency Injection:</strong> kontroler zależy od interfejsu <code>IProductRepository</code>, a nie od konkretnej implementacji pamięciowej.</li>
+      <li><strong>Asynchroniczność:</strong> kontrakt repozytorium i akcje kontrolera używają <code>Task</code>, <code>async</code> oraz <code>await</code>. Przy zastąpieniu pamięci bazą danych interfejs nie wymaga zmiany.</li>
+      <li><strong>Walidacja:</strong> nazwa jest wymagana, ograniczona do 120 znaków i nie może składać się wyłącznie z białych znaków. Cena musi być większa od zera, a ilość nie może być ujemna.</li>
+      <li><strong>Współbieżność:</strong> <code>ConcurrentDictionary</code> pozwala bezpiecznie obsługiwać równoległe żądania bez własnych blokad.</li>
+      <li><strong>HTTPS:</strong> <code>UseHttpsRedirection</code> przekierowuje ruch HTTP na HTTPS, jeśli dostępny jest endpoint HTTPS.</li>
+      <li><strong>Ograniczenie rozwiązania:</strong> dane są tracone po restarcie procesu. W systemie produkcyjnym należy dodać trwałe repozytorium, uwierzytelnianie, autoryzację, logowanie, limity żądań i obsługę błędów globalnych.</li>
+    </ul>
+  </section>
+</div></div></div></article>

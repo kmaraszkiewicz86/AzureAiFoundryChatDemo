@@ -1,0 +1,161 @@
+<article class="streaming-response"><strong>Model:</strong> <u>gpt-5.6-sol-high</u><p><strong>Execution time:</strong> 36891 ms</p><p><strong>Input tokens:</strong> 1152</p><p><strong>Output tokens:</strong> 2660</p><p><strong>Total tokens:</strong> 3812</p><p><strong>Question:</strong> Przeanalizuj poniższy kod C#. Znajdź błędy, problemy związane z async/await, obsługą wyjątków, wydajnością oraz jakością kodu. Zaproponuj tylko niezbędne poprawki bez niepotrzebnego przepisywania całej implementacji. Wyjaśnij każdą zaproponowaną zmianę.
+	
+	public async Task&lt;Product?&gt; GetProductAsync(int id)
+	{
+	    var product = _repository.GetById(id);
+	
+	    if (product == null)
+	    {
+	        throw new Exception("Product not found");
+	    }
+	
+	    return await Task.FromResult(product);
+	}</p><div><p><strong>Answer:</strong></p><div><div class="vertical-stack">
+<section class="vertical-stack-item">
+<h2>Ocena kodu</h2>
+<p>Metoda jest formalnie asynchroniczna, ale wszystkie operacje wykonuje synchronicznie. <code>Task.FromResult</code> nie zmienia synchronicznego odczytu w operację asynchroniczną, a użycie <code>await</code> tworzy niepotrzebną maszynę stanów.</p>
+<ul>
+<li><strong>Pozorna asynchroniczność:</strong> <code>_repository.GetById(id)</code> blokuje bieżący wątek, jeśli wykonuje operację wejścia/wyjścia, na przykład zapytanie do bazy danych.</li>
+<li><strong>Zbędne <code>await Task.FromResult(...)</code>:</strong> obiekt jest już dostępny, więc opakowanie go w ukończone zadanie nie daje korzyści.</li>
+<li><strong>Zbyt ogólny wyjątek:</strong> <code>Exception</code> utrudnia rozróżnienie braku produktu od awarii infrastruktury lub błędu programistycznego.</li>
+<li><strong>Niespójna nullowalność:</strong> metoda deklaruje <code>Product?</code>, mimo że dla braku produktu zawsze zgłasza wyjątek. Pomyślny wynik nigdy nie jest wartością <code>null</code>.</li>
+<li><strong>Brak anulowania:</strong> prawdziwa operacja asynchroniczna powinna przyjmować <code>CancellationToken</code> i przekazywać go do repozytorium.</li>
+<li><strong>Brak walidacji identyfikatora:</strong> niepoprawny identyfikator warto odrzucić przed wywołaniem repozytorium.</li>
+</ul>
+</section>
+
+<section class="vertical-stack-item">
+<h2>Zalecana minimalna poprawka</h2>
+<p>Jeżeli repozytorium korzysta z bazy danych lub innego źródła wejścia/wyjścia, powinno udostępniać prawdziwie asynchroniczną metodę. Nie jest konieczne przebudowywanie pozostałej części implementacji.</p>
+<h3>ProductService.cs</h3>
+<pre><code class="language-csharp">using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Products;
+
+public sealed class Product
+{
+    public int Id { get; init; }
+
+    public required string Name { get; init; }
+}
+
+public interface IProductRepository
+{
+    Task&lt;Product?&gt; GetByIdAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class ProductService
+{
+    private readonly IProductRepository _repository;
+
+    public ProductService(IProductRepository repository)
+    {
+        _repository = repository
+            ?? throw new ArgumentNullException(nameof(repository));
+    }
+
+    public async Task&lt;Product&gt; GetProductAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+
+        var product = await _repository.GetByIdAsync(
+            id,
+            cancellationToken);
+
+        if (product is null)
+        {
+            throw new KeyNotFoundException(
+                $"Product with ID {id} was not found.");
+        }
+
+        return product;
+    }
+}</code></pre>
+</section>
+
+<section class="vertical-stack-item">
+<h2>Wyjaśnienie zmian</h2>
+<ol>
+<li>
+<strong>Wywołanie <code>GetByIdAsync</code> zamiast <code>GetById</code>.</strong>
+<p>Daje rzeczywistą asynchroniczność, o ile implementacja repozytorium używa asynchronicznego API źródła danych, na przykład <code>FindAsync</code> albo <code>SingleOrDefaultAsync</code> w Entity Framework Core. Poprawia to skalowalność aplikacji serwerowej, ponieważ wątek nie musi oczekiwać synchronicznie na operację wejścia/wyjścia.</p>
+</li>
+<li>
+<strong>Usunięcie <code>Task.FromResult</code>.</strong>
+<p><code>Task.FromResult</code> służy do utworzenia już zakończonego zadania. Nie wykonuje pracy w tle ani nie zwalnia wątku. Po prawdziwym <code>await</code> metoda może bezpośrednio zwrócić <code>product</code>.</p>
+</li>
+<li>
+<strong>Zmiana wyniku z <code>Task&lt;Product?&gt;</code> na <code>Task&lt;Product&gt;</code>.</strong>
+<p>Kontrakt odpowiada rzeczywistemu zachowaniu: metoda zwraca produkt albo zgłasza wyjątek. Wywołujący nie musi wykonywać zbędnej kontroli wartości <code>null</code>.</p>
+</li>
+<li>
+<strong>Użycie <code>KeyNotFoundException</code>.</strong>
+<p>Jest bardziej precyzyjne niż ogólny <code>Exception</code> i pozwala warstwie HTTP lub middleware odróżnić brak zasobu od błędu serwera. W większej domenie można zamiast niego zastosować istniejący wyjątek domenowy, na przykład <code>ProductNotFoundException</code>, ale tworzenie nowej hierarchii wyjątków nie jest konieczne dla tej poprawki.</p>
+</li>
+<li>
+<strong>Dodanie <code>CancellationToken</code>.</strong>
+<p>Anulowanie żądania może zostać przekazane aż do sterownika bazy danych. Ogranicza to wykonywanie niepotrzebnej pracy po przerwaniu żądania przez klienta.</p>
+</li>
+<li>
+<strong>Walidacja <code>id</code>.</strong>
+<p>Wartości niedodatnie są odrzucane jako błędny argument, bez niepotrzebnego zapytania do repozytorium. Brak produktu o poprawnym identyfikatorze pozostaje osobnym przypadkiem.</p>
+</li>
+<li>
+<strong>Brak lokalnego bloku <code>try/catch</code>.</strong>
+<p>Metoda nie ma możliwości naprawienia błędu repozytorium, dlatego nie powinna przechwytywać wyjątków tylko po to, aby zgłosić je ponownie. Naturalna propagacja zachowuje typ wyjątku i pełny stos wywołań. Logowanie oraz mapowanie błędów na odpowiedzi HTTP najlepiej wykonać centralnie.</p>
+</li>
+</ol>
+</section>
+
+<section class="vertical-stack-item">
+<h2>Wariant dla repozytorium wyłącznie synchronicznego</h2>
+<p>Jeżeli repozytorium działa w pamięci albo z założenia ma wyłącznie synchroniczne API, metoda serwisu również powinna być synchroniczna. Nie należy używać <code>Task.Run</code> ani <code>Task.FromResult</code> tylko po to, aby zachować pozór asynchroniczności.</p>
+<pre><code class="language-csharp">public Product GetProduct(int id)
+{
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+
+    var product = _repository.GetById(id);
+
+    if (product is null)
+    {
+        throw new KeyNotFoundException(
+            $"Product with ID {id} was not found.");
+    }
+
+    return product;
+}</code></pre>
+<p>Jeśli istniejący interfejs bezwzględnie wymaga zwrócenia <code>Task&lt;Product&gt;</code>, można zwrócić <code>Task.FromResult(product)</code> bez słów kluczowych <code>async</code> i <code>await</code>. Jest to jednak jedynie adapter kontraktu, a nie prawdziwa operacja asynchroniczna.</p>
+</section>
+
+<section class="vertical-stack-item">
+<h2>Obsługa braku produktu jako zwykłego wyniku</h2>
+<p>Jeżeli brak produktu jest oczekiwanym przypadkiem biznesowym, alternatywnym i często prostszym kontraktem jest zwrócenie <code>null</code> bez wyjątku:</p>
+<pre><code class="language-csharp">public Task&lt;Product?&gt; GetProductAsync(
+    int id,
+    CancellationToken cancellationToken = default)
+{
+    ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
+
+    return _repository.GetByIdAsync(id, cancellationToken);
+}</code></pre>
+<p>Należy wybrać jeden kontrakt konsekwentnie: albo <code>Product</code> i wyjątek dla braku zasobu, albo <code>Product?</code> i jawna obsługa <code>null</code> przez kod wywołujący. Nie należy jednocześnie deklarować nullable i zawsze zgłaszać wyjątku.</p>
+</section>
+
+<section class="vertical-stack-item">
+<h2>Najważniejsze testy</h2>
+<ul>
+<li>Dodatni identyfikator istniejącego produktu zwraca oczekiwany obiekt.</li>
+<li>Dodatni identyfikator nieistniejącego produktu powoduje <code>KeyNotFoundException</code>.</li>
+<li>Identyfikator równy zero lub ujemny powoduje <code>ArgumentOutOfRangeException</code> bez wywołania repozytorium.</li>
+<li>Anulowany token jest przekazywany do repozytorium, a operacja może zakończyć się <code>OperationCanceledException</code>.</li>
+<li>Wyjątki infrastrukturalne repozytorium nie są zastępowane ogólnym wyjątkiem i zachowują swój stos wywołań.</li>
+</ul>
+</section>
+</div></div></div></article>
