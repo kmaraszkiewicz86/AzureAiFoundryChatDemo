@@ -253,9 +253,10 @@ Poniżej znajduje się lista źródeł wykorzystanych podczas tworzenia artykuł
    - `gpt-5.6-terra`
    - `gpt-5.6-sol`
 
-3. **AzureAiFoundryChatDemo – GitHub Repository**  
-   https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo  
-   Repozytorium zawierające kod źródłowy aplikacji przedstawionej w artykule.
-
 > **Informacja:** Dokumentacja, funkcjonalności Microsoft Foundry oraz ceny modeli mogą zmieniać się w czasie. Informacje przedstawione w artykule były aktualne w momencie jego tworzenia. W przypadku cen modeli warto zawsze zweryfikować aktualny cennik na oficjalnej stronie Microsoft Azure.
 
+## Kod źródłowy i materiały projektu
+
+Kod źródłowy aplikacji, pełne odpowiedzi wygenerowane przez testowane modele, wyniki poszczególnych testów oraz szczegółowe porównania można znaleźć w repozytorium GitHub projektu:
+
+https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo
