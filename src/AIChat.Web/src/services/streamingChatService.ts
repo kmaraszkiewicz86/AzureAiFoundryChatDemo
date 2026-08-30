@@ -57,7 +57,7 @@ export class StreamingChatService {
     })
   }
 
-  /** Appends a model's text and applies its status and backend execution time. */
+  /** Appends a model's text and applies its status, backend execution time, and token usage. */
   private updateResponse(event: StreamingEvent, status: StreamingResponse['status']): void {
     const previous = this.progress.responses.find((response) => response.LLModelName === event.llModelName)
     const response: StreamingResponse = {
@@ -65,6 +65,9 @@ export class StreamingChatService {
       answer: (previous?.answer ?? '') + (event.chunk ?? ''),
       status,
       elapsedMilliseconds: event.elapsedMilliseconds ?? previous?.elapsedMilliseconds ?? 0,
+      inputTokens: event.inputTokens ?? previous?.inputTokens,
+      outputTokens: event.outputTokens ?? previous?.outputTokens,
+      totalTokens: event.totalTokens ?? previous?.totalTokens,
       error: status === ResponseStatus.Failed ? event.error ?? ChatErrors.ModelFailed : undefined,
     }
     const responses = previous

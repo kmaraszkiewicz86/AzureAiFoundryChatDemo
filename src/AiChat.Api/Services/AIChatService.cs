@@ -158,6 +158,7 @@ public sealed class AIChatService : IAIChatService
             string chatPrompt = GenerateChatPrompt(question);
             ChatClient chatClient = _client.GetChatClient(deploymentName);
             ChatMessage[] messages = [new UserChatMessage(chatPrompt)];
+            ChatTokenUsage? tokenUsage = null;
 
             AsyncCollectionResult<StreamingChatCompletionUpdate> chatResponseStreaming = chatClient.CompleteChatStreamingAsync(
                 messages,
@@ -165,6 +166,9 @@ public sealed class AIChatService : IAIChatService
 
             await foreach (StreamingChatCompletionUpdate update in chatResponseStreaming)
             {
+                // Usage contains request totals and may arrive in a final update without any text.
+                tokenUsage = update.Usage ?? tokenUsage;
+
                 foreach (ChatMessageContentPart contentPart in update.ContentUpdate)
                 {
                     if (string.IsNullOrEmpty(contentPart.Text))
@@ -198,7 +202,10 @@ public sealed class AIChatService : IAIChatService
                     {
                         RequestId = requestId,
                         LLModelName = deploymentName,
-                        stopwatch.ElapsedMilliseconds
+                        stopwatch.ElapsedMilliseconds,
+                        InputTokens = tokenUsage?.InputTokenCount,
+                        OutputTokens = tokenUsage?.OutputTokenCount,
+                        TotalTokens = tokenUsage?.TotalTokenCount
                     },
                     cancellationToken);
         }

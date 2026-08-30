@@ -5,4 +5,7 @@ export interface StreamingEvent {
   chunk?: string
   error?: string
   elapsedMilliseconds?: number
+  inputTokens?: number | null
+  outputTokens?: number | null
+  totalTokens?: number | null
 }

@@ -1,10 +1,13 @@
 import type { AskQuestionResponse } from './askQuestionResponse'
 import type { ResponseStatus } from '../constants/chatConstants'
 
-/** A model answer assembled from SignalR chunks, including backend execution time. */
+/** A model answer assembled from SignalR chunks, including backend execution time and token usage. */
 export interface StreamingResponse extends AskQuestionResponse {
   status: typeof ResponseStatus[keyof typeof ResponseStatus]
   error?: string
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
 }
 
 /** Responses and request progress prepared by the service. */

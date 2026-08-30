@@ -63,6 +63,13 @@ function StreamingChat() {
               {response.status !== 'streaming' && (
                 <p><strong>Execution time:</strong> {response.elapsedMilliseconds} ms</p>
               )}
+              {response.status === 'completed' && (
+                <>
+                  <p><strong>Input tokens:</strong> {response.inputTokens ?? 'N/A'}</p>
+                  <p><strong>Output tokens:</strong> {response.outputTokens ?? 'N/A'}</p>
+                  <p><strong>Total tokens:</strong> {response.totalTokens ?? 'N/A'}</p>
+                </>
+              )}
               <p><strong>Question:</strong> {submittedQuestion}</p>
               <div>
                 <p><strong>Answer:</strong></p>
