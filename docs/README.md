@@ -122,13 +122,14 @@ Ostatecznie moja lista deployment'u, jest pokazana na poniższym screen'ie:
 ## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i ile tokenów jest wykorzystywane przez 3 różne modele.
 Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami, ile tokenów wykorzystują oraz jakie są koszty poszczególnych zapytań. Trzeba przy tym pamiętać, że liczba zużytych tokenów może się różnić, dlatego przedstawione wyniki mogą być inne niż wyniki zaobserwowane na innych środowiskach.
 
+
 ## Analiza modeli
 
 W artykule nie będą zamieszczane pełne odpowiedzi generowane przez poszczególne modele, ponieważ w przypadku bardziej rozbudowanych promptów mogą one być bardzo obszerne.
 
 Dla każdego testu szczegółowe wyniki będą zapisywane w repozytorium GitHub projektu:
 
-https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo
+[https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/tree/main/results](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/tree/main/results)
 
 Przy każdym porównaniu w artykule zostanie umieszczony link do odpowiedniego katalogu z wynikami. Dzięki temu będzie można sprawdzić:
 
@@ -152,14 +153,44 @@ Takie podejście pozwala zachować czytelność samego artykułu, a jednocześni
 <img width="1906" height="370" alt="image" src="https://github.com/user-attachments/assets/277af9ab-6db3-4703-b592-bdd29df3ea78" />
 Wyniki są następujące:
 
+| Model | Pełna odpowiedź | Tokeny wejściowe | Tokeny wyjściowe | Tokeny łącznie | Koszt łączny (EUR) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| gpt-5.4-mini-low | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-1/gpt-5.4-mini-low.html) | 1066 | 871 | 1937 | 0,00415272 |
+| gpt-5.6-sol-high | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-1/gpt-5.6-sol-high.html) | 1066 | 1124 | 2190 | 0,03431904 |
+| gpt-5.6-terra-medium | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-1/gpt-5.6-terra-medium.html) | 1066 | 1098 | 2164 | 0,01346006 |
+
+[Szczegółowe porównanie odpowiedzi modeli](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-1/comparison.md)
+
+**Skrót oceny:** Najlepiej wypadł **gpt-5.6-terra-medium**, nieznacznie wyprzedzając **gpt-5.6-sol-high**. Oba modele poprawnie wskazały .NET 10 jako najnowszą stabilną wersję i przygotowały kompletny przykład. Terra przedstawił nieco czytelniejszą kolejność przygotowania i uruchomienia projektu. **gpt-5.4-mini-low** był najtańszy i najszybszy, ale błędnie wskazał .NET 8 jako najnowszą stabilną wersję, dlatego zajął trzecie miejsce.
+
 1. Teraz przejdźmy do bardziej złożonego pytania:
 `Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania.`
 <img width="1895" height="348" alt="image" src="https://github.com/user-attachments/assets/1b94c320-82c2-4e1a-9fc4-a8ec91b1d9fe" />
 Wyniki są następujące:
 
+| Model | Pełna odpowiedź | Tokeny wejściowe | Tokeny wyjściowe | Tokeny łącznie | Koszt łączny (EUR) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| gpt-5.4-mini-low | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-2/gpt-5.4-mini-low.html) | 1093 | 3475 | 4568 | 0,01448238 |
+| gpt-5.6-sol-high | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-2/gpt-5.6-sol-high.html) | 1093 | 5258 | 6351 | 0,14341008 |
+| gpt-5.6-terra-medium | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-2/gpt-5.6-terra-medium.html) | 1093 | 5051 | 6144 | 0,05521173 |
+
+[Szczegółowe porównanie odpowiedzi modeli](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-2/comparison.md)
+
+**Skrót oceny:** Najlepiej wypadł **gpt-5.6-sol-high**, nieznacznie wyprzedzając **gpt-5.6-terra-medium**. Sol przygotował najbardziej kompletny przykład, z dobrą obsługą błędów, jasnym wyjaśnieniem kontraktu asynchronicznego i praktycznymi przykładami użycia API. Terra był prostszą i tańszą alternatywą. Oba modele miały jednak problem z walidacją wartości `decimal` zależną od ustawień regionalnych. **gpt-5.4-mini-low** był najtańszy i najszybszy, ale jego rozwiązanie zawierało brakującą zależność Swaggera oraz problem z `CreatedAtAction`, dlatego zajął trzecie miejsce.
+
 1. Najpierw zacznijmy od prostego pytania i zobaczymy jak sobie radzą 3 rózne modele poradzą, więc zaczynamy od pytania:
 `Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.`
 Wyniki są następujące:
+
+| Model | Pełna odpowiedź | Tokeny wejściowe | Tokeny wyjściowe | Tokeny łącznie | Koszt łączny (EUR) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| gpt-5.4-mini-low | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-3/gpt-5.4-mini-low.html) | 1135 | 8685 | 9820 | 0,03514170 |
+| gpt-5.6-sol-high | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-3/gpt-5.6-sol-high.html) | 1135 | 15206 | 16341 | 0,40582416 |
+| gpt-5.6-terra-medium | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-3/gpt-5.6-terra-medium.html) | 1135 | 10596 | 11731 | 0,11378540 |
+
+[Szczegółowe porównanie odpowiedzi modeli](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-3/comparison.md)
+
+**Skrót oceny:** Najlepiej wypadł **gpt-5.6-sol-high**, przed **gpt-5.6-terra-medium** i **gpt-5.4-mini-low**. Sol przygotował najbardziej konkretne mechanizmy obsługi współbieżności, idempotencji, pobierania wiarygodnych cen, izolacji danych klienta oraz awarii cache. Jego rozwiązanie zawierało jednak istotny problem ze stanem `DbContext` podczas ponowień i wymaga poprawek przed wykorzystaniem produkcyjnym. Terra zaproponował wartościowe podejście z kluczem idempotencji ograniczonym do klienta oraz wzorcem Outbox, ale miał problemy z zależnościami i połączeniem jawnych transakcji z mechanizmem ponowień EF Core. Mini był najtańszy i najszybszy, ale zawierał najwięcej rozbieżności pomiędzy deklarowaną gotowością produkcyjną a faktyczną implementacją.
 
 1. Na koniec pytanie na prosty refactoring danej metody, można sprawdzić jak dane modele poradzą sobię z refactoringiem:
 `Przeanalizuj poniższy kod C#. Znajdź błędy, problemy związane z async/await, obsługą wyjątków, wydajnością oraz jakością kodu. Zaproponuj tylko niezbędne poprawki bez niepotrzebnego przepisywania całej implementacji. Wyjaśnij każdą zaproponowaną zmianę.
@@ -176,6 +207,36 @@ Wyniki są następujące:
 	    return await Task.FromResult(product);
 	}`
 Wyniki są następujące:
+
+| Model | Pełna odpowiedź | Tokeny wejściowe | Tokeny wyjściowe | Tokeny łącznie | Koszt łączny (EUR) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| gpt-5.4-mini-low | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-4/gpt-5.4-mini-low.html) | 1152 | 1589 | 2741 | 0,00705276 |
+| gpt-5.6-sol-high | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-4/gpt-5.6-sol-high.html) | 1152 | 2660 | 3812 | 0,07518640 |
+| gpt-5.6-terra-medium | [Otwórz odpowiedź](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-4/gpt-5.6-terra-medium.html) | 1152 | 2446 | 3598 | 0,02783282 |
+
+[Szczegółowe porównanie odpowiedzi modeli](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-4/comparison.md)
+
+**Skrót oceny:** Najlepiej wypadł **gpt-5.6-terra-medium**, nieznacznie wyprzedzając **gpt-5.6-sol-high**. Terra najlepiej rozróżnił sytuację, w której repozytorium pozostaje synchroniczne, od rzeczywistego asynchronicznego I/O i uwzględnił możliwość zachowania istniejącego kontraktu `Task`. Sol poprawnie wyjaśnił asynchroniczne I/O i propagowanie anulowania, ale dodał więcej kodu niż wymagał prosty refactoring oraz nieuzasadnioną regułę wymagającą dodatniego ID. Mini był najtańszy i najkrótszy, lecz jego preferowana poprawka zmieniała zachowanie metody przy braku produktu i pomijała istotne różnice w sposobie propagowania wyjątków.
+
+## Końcowe podsumowanie
+
+[Szczegółowe końcowe porównanie modeli](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/final-comparison.md)
+
+| Model | Tokeny wejściowe | Tokeny wyjściowe | Tokeny łącznie | Koszt łączny (EUR) |
+| --- | ---: | ---: | ---: | ---: |
+| gpt-5.4-mini-low | 4446 | 14620 | 19066 | 0,06082956 |
+| gpt-5.6-sol-high | 4446 | 24248 | 28694 | 0,65873968 |
+| gpt-5.6-terra-medium | 4446 | 19191 | 23637 | 0,21029001 |
+
+Łączny szacunkowy koszt tokenów wszystkich dwunastu odpowiedzi wyniósł **0,92985925 EUR**.
+
+**gpt-5.4-mini-low** był najtańszy i najszybszy we wszystkich czterech testach, ale w każdym porównaniu jakościowym zajął trzecie miejsce. Jego odpowiedzi zawierały między innymi błędne wskazanie wersji .NET, brakujące zależności, problem z generowaniem linku po `POST` oraz zmianę zachowania refaktoryzowanej metody przy braku produktu.
+
+**gpt-5.6-terra-medium** wygrał prompty 1 i 4, a w promptach 2 i 3 zajął drugie miejsce. Zapewnił najlepszy kompromis pomiędzy jakością odpowiedzi, kosztem i czasem generowania. Był wyraźnie tańszy od Sol, jednocześnie zachowując wysoką jakość techniczną odpowiedzi.
+
+**gpt-5.6-sol-high** wygrał prompty 2 i 3, czyli oba bardziej rozbudowane zadania dotyczące projektowania API. Największą przewagę pokazał przy projektowaniu produkcyjnego API zamówień, gdzie zaproponował najbardziej konkretne mechanizmy związane ze współbieżnością, idempotencją i ochroną danych. Był jednak zdecydowanie najdroższym i najwolniejszym z porównywanych modeli, a jego dodatkowa szczegółowość nie dawała przewagi w prostszych zadaniach.
+
+**Ostatecznie gpt-5.6-terra-medium zapewnił najlepszy kompromis jakości, kosztu i czasu w całym zestawie testów. gpt-5.6-sol-high był najmocniejszy w bardziej złożonych zadaniach projektowych dotyczących API, natomiast gpt-5.4-mini-low wygrywał ceną i szybkością, ale wymagał największej ostrożności przy praktycznym wykorzystaniu wygenerowanego kodu.**
 
 ## Źródła i materiały
 
