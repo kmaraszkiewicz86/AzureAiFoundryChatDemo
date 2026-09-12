@@ -1,6 +1,20 @@
 
 ## Wstęp
-Artykuł będzie przedstawiał, jak można z pomocą React + SignalR + .NET API stworzyć prosty projekt, zawierający logikę AI, która będzie korzystać z technologii Azure AI Foundry. Dodam również 3 modele LLM: 1x low, 1x medium oraz 1x high, aby sprawdzić koszty oraz jakość odpowiedzi na 4 oddzielne prompty.
+
+Artykuł będzie przedstawiał, jak można za pomocą React + SignalR + .NET API stworzyć prosty projekt zawierający logikę AI, która będzie korzystać z technologii Azure AI Foundry. Dodam również 3 modele LLM: 1x low, 1x medium oraz 1x high, aby sprawdzić koszty oraz jakość odpowiedzi na 4 oddzielne prompty.
+
+Artykuł podzieliłem na następujące części:
+
+- **Tworzenie serwisu AI Foundry w środowisku Azure** — pokażę, jak utworzyć zasób Foundry i przygotować modele do testów.
+- **Omówienie logiki po stronie UI** — przejdę przez obsługę formularza, wysłanie pytania i wyświetlanie kolejnych fragmentów odpowiedzi.
+- **Omówienie logiki po stronie API** — wyjaśnię, jak kontroler, kolejka i serwis AI współpracują przy generowaniu odpowiedzi.
+- **Uruchomienie projektu lokalnie** — pokażę, jak skonfigurować dostęp do modeli i uruchomić API oraz UI.
+- **Analiza 4 pytań od użytkownika** — przedstawię, co porównuję pod względem jakości odpowiedzi, kosztów i zużycia tokenów.
+- **Analiza modeli** — pokażę wyniki czterech testów i najważniejsze różnice pomiędzy odpowiedziami modeli.
+- **Końcowe podsumowanie** — zbiorę koszty i zużycie tokenów oraz opiszę, który model najlepiej sprawdził się w moich testach.
+- **Źródła i materiały** — podam źródła wykorzystane podczas przygotowywania artykułu.
+- **Kod źródłowy i materiały projektu** — wskażę repozytorium z aplikacją, pełnymi odpowiedziami i porównaniami.
+
 1. ### Proste zadanie — podstawowe generowanie kodu: <br />
 	#### Prompt:  <br />
 	Stwórz prostą aplikację konsolową Hello World w C# z użyciem najnowszej stabilnej wersji .NET. Pokaż kompletny kod oraz krótko wyjaśnij, jak uruchomić aplikację.
@@ -10,14 +24,14 @@ Artykuł będzie przedstawiał, jak można z pomocą React + SignalR + .NET API 
 1. ### Średnio zaawansowane zadanie — implementacja REST API:  <br />
 	#### Prompt:  <br />
 	Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania. 
-	- #### Dlaczego ten prompt?: <br />
+	- #### Dlaczego ten prompt? <br />
 		To zadanie jest bliższe rzeczywistemu zastosowaniu modelu przez programistę. Pozwala sprawdzić, czy model poprawnie rozumie strukturę aplikacji ASP.NET Core, Dependency Injection, programowanie asynchroniczne oraz podstawowe zasady projektowania API. Odpowiedź powinna być wyraźnie bardziej rozbudowana niż w pierwszym teście, dlatego można również porównać wzrost liczby tokenów i kosztu.
 
 1. ### Zaawansowane zadanie — architektura i implementacja:  <br />
 	#### Prompt:  <br />
 	Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.
 	- #### Dlaczego ten prompt?  <br />
-		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość reasoning, znajomość zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku będzie można sprawdzić, czy różnice pomiędzy słabszymi i mocniejszymi modelami są bardziej widoczne.
+		Ten test wymaga od modelu nie tylko wygenerowania kodu, ale również analizy problemu i podejmowania decyzji architektonicznych. Pozwala sprawdzić jakość rozumowania, znajomość zagadnień związanych z wydajnością, bezpieczeństwem i skalowaniem oraz umiejętność uzasadniania proponowanych rozwiązań. W tym przypadku będzie można sprawdzić, czy różnice pomiędzy słabszymi i mocniejszymi modelami są bardziej widoczne.
 
 1. ### Analiza istniejącego kodu — Code Review
 
@@ -44,55 +58,75 @@ Artykuł będzie przedstawiał, jak można z pomocą React + SignalR + .NET API 
 	
 	Dzięki temu można łatwo porównać, czy różne modele wykrywają te same problemy, czy proponują minimalne i poprawne zmiany oraz jak dobrze uzasadniają swoje decyzje.
 
-W artykule wyjaśnię również logikę UI oraz API, omówię, jak można stworzyć prompt w API, zawierający pytanie od użytkownika.
+W artykule wyjaśnię również logikę UI oraz API i omówię, jak można stworzyć prompt w API zawierający pytanie od użytkownika.
 
-## Tworzenie serwisu AI Foundry na środowisku Azure
+## Tworzenie serwisu AI Foundry w środowisku Azure
 
-Wejdź na konto Azure 
+Wejdź na konto Azure:
 https://portal.azure.com/
-1. Zaloguj się albo stwórz konto jeżeli go nie masz. W głównym katalogu kliknij przycisk Create.
+1. Zaloguj się albo stwórz konto, jeżeli go nie masz. Na stronie głównej kliknij przycisk Create.
 
 	<img width="536" height="340" alt="image" src="https://github.com/user-attachments/assets/302958eb-c5ae-4737-b168-50c206a05698" />
 
-1. Potem w polu wyszukiwania wpisz AI foundry
+	*Rysunek 1. Strona główna portalu Azure z opcją „Create a resource”.*
+
+1. Potem w polu wyszukiwania wpisz AI Foundry.
 
 	<img width="640" height="290" alt="image" src="https://github.com/user-attachments/assets/35f0074d-8c55-4ce0-98ca-b44e5be3074d" />
 
-1. Wybierz Microsoft Foundry od Microsoft.
+	*Rysunek 2. Wyszukiwanie usługi AI Foundry w Azure Marketplace.*
+
+1. Wybierz Microsoft Foundry od firmy Microsoft.
 
 	<img width="1359" height="775" alt="image" src="https://github.com/user-attachments/assets/9f454e9f-78df-4cca-9c17-5b95144b37b0" />
+
+	*Rysunek 3. Kafelek Microsoft Foundry opublikowany przez firmę Microsoft.*
 
 1. Stwórz lub wybierz Resource Group:
 
 	<img width="718" height="693" alt="image" src="https://github.com/user-attachments/assets/3e63ced0-bf38-449c-b073-ef78303aed87" />
 
-1. Wypełnij pole Name oraz nazwę projektu.
+	*Rysunek 4. Tworzenie grupy zasobów podczas konfiguracji Foundry.*
+
+1. Wypełnij pole Name oraz pole z nazwą projektu.
 
 	<img width="942" height="948" alt="image" src="https://github.com/user-attachments/assets/ee3a0efb-4db5-4a97-b4e5-4cd243c53af4" />
 
-1. Kliknij przycisk 'Review + create', następnie 'Create'.
+	*Rysunek 5. Formularz z nazwą zasobu, regionem i domyślną nazwą projektu.*
+
+1. Kliknij przycisk „Review + create”, a następnie „Create”.
 
 	Teraz, aby przejść do Azure AI Foundry, odszukaj zasób Azure:
 
 	<img width="1376" height="442" alt="image" src="https://github.com/user-attachments/assets/a9c95e8f-30a6-4484-b32c-da9701463929" />
 
-1. W następnym oknie kliknij przycisk Go to Foundry portal
+	*Rysunek 6. Zasób Foundry na liście ostatnio używanych zasobów w portalu Azure.*
+
+1. W następnym oknie kliknij przycisk „Go to Foundry portal”.
 
 	<img width="1395" height="729" alt="image" src="https://github.com/user-attachments/assets/b2ea9326-e8ab-4a02-a8c5-6b459cbcce28" />
 
-1. Przejdź do wyboru modelu i kliknij 'Explore models'.
+	*Rysunek 7. Przejście ze strony zasobu Azure do portalu Foundry przyciskiem „Go to Foundry portal”.*
+
+1. Przejdź do wyboru modelu i kliknij „Explore models”.
 
 	<img width="1496" height="815" alt="image" src="https://github.com/user-attachments/assets/642bd1d7-358a-411e-a7c7-168596bb421f" />
 
-1. Z listy wybierz model np. gpt-5.6-sol
+	*Rysunek 8. Strona główna projektu Foundry z opcją „Explore models”.*
+
+1. Z listy wybierz model, np. gpt-5.6-sol.
    
 	<img width="1588" height="310" alt="image" src="https://github.com/user-attachments/assets/806c3b79-527e-47ca-8e3b-86f242a01321" />
+
+	*Rysunek 9. Katalog modeli dostępnych w projekcie, w tym gpt-5.6-sol.*
 
 1. Na następnym ekranie wybierz Default settings lub Custom settings, w zależności od tego, czy chcesz użyć domyślnej nazwy i ustawień, czy skonfigurować je samodzielnie.
 
 	<img width="1401" height="277" alt="image" src="https://github.com/user-attachments/assets/00489dcb-38ce-4ec2-b873-24a6239436f9" />
 
-1. Ja wybiorę Custom settings i nazwę model po swojemu. Dla potrzeb tego artykułu stworzę 3 różne modele do testów, dzięki którym będę mógł porównać koszty oraz jakość odpowiedzi:
+	*Rysunek 10. Wybór ustawień domyślnych lub własnych podczas wdrażania modelu.*
+
+1. Ja wybiorę Custom settings i nazwę model po swojemu. Na potrzeby tego artykułu stworzę 3 różne modele do testów, dzięki którym będę mógł porównać koszty oraz jakość odpowiedzi:
 	- **"gpt-5.4-mini-low"** – użyty będzie model `gpt-5.4-mini`.  
 	  Cena Global Standard za 1 mln tokenów: **€0.66 input / €3.96 output**.  
 	  Jest około **2.67x tańszy od gpt-5.6-terra** oraz około **6.67x tańszy od gpt-5.6-sol**.
@@ -111,8 +145,10 @@ https://portal.azure.com/
 	
 	> **Uwaga:** Ceny zostały sprawdzone podczas tworzenia artykułu i dotyczą wariantu Global Standard. Cennik Microsoft Azure może ulec zmianie, dlatego przed wykonaniem własnych testów warto sprawdzić aktualne ceny na oficjalnej stronie Azure.
 
-Ostatecznie moja lista deployment'u, jest pokazana na poniższym screen'ie:
+Ostatecznie moja lista deploymentów jest pokazana na poniższym screenie:
 	<img width="1594" height="312" alt="image" src="https://github.com/user-attachments/assets/a61084b1-5e75-43ce-9912-b14233580b6d" />
+
+*Rysunek 11. Trzy wdrożenia modeli przygotowane do porównania odpowiedzi w aplikacji.*
 
    
 ## Omówienie logiki po stronie UI
@@ -136,7 +172,7 @@ SignalR utrzymuje połączenie, przez które API przesyła do przeglądarki zdar
    const { submittedQuestion, responses, error, isLoading } = state
    ```
 
-   `service.current` daje kolejnym renderowaniom dostęp do tej samej używanej instancji serwisu. `submittedQuestion` pozwala wyświetlać pytanie przy odpowiedziach także po wyczyszczeniu formularza, `responses` zawiera wyniki modeli, `error` opisuje błąd całego żądania, a `isLoading` steruje dostępnością formularza.
+   `service.current` daje kolejnym renderowaniom dostęp do tej samej instancji serwisu. `submittedQuestion` pozwala wyświetlać pytanie przy odpowiedziach także po wyczyszczeniu formularza, `responses` zawiera wyniki modeli, `error` opisuje błąd całego żądania, a `isLoading` steruje dostępnością formularza.
 
    Powiązanie `<form onSubmit={handleSubmit}>` prowadzi do następującej metody:
 
@@ -156,9 +192,9 @@ SignalR utrzymuje połączenie, przez które API przesyła do przeglądarki zdar
    }
    ```
 
-   `preventDefault()` zatrzymuje standardowe wysłanie formularza przez przeglądarkę. `FormData` odczytuje pole po jego nazwie, `trim()` usuwa skrajne białe znaki, a dwa warunki pomijają wysłanie podczas generowania i pytanie bez treści.
+   `preventDefault()` zatrzymuje standardowe wysłanie formularza przez przeglądarkę. `FormData` odczytuje pole po jego nazwie, `trim()` usuwa skrajne białe znaki, a dwa warunki pomijają wysłanie podczas generowania oraz wysłanie pytania bez treści.
 
-   Callback przekazany do `ask` może zostać wywołany wiele razy: przy rozpoczęciu, nadejściu fragmentu i zakończeniu modelu. Każde `setState` przekazuje Reactowi nowy stan do wyświetlenia; wynik `queued` informuje o rozpoczęciu obsługi żądania, więc `form.reset()` może wyczyścić pole, gdy modele jeszcze generują odpowiedzi.
+   Callback przekazany do `ask` może zostać wywołany wiele razy: przy rozpoczęciu, nadejściu fragmentu i zakończeniu odpowiedzi modelu. Każde `setState` przekazuje Reactowi nowy stan do wyświetlenia; wynik `queued` informuje o rozpoczęciu obsługi żądania, więc `form.reset()` może wyczyścić pole, gdy modele jeszcze generują odpowiedzi.
 
 1. **Serwis przygotowuje nowe żądanie i ustala kolejność operacji.**
 
@@ -319,9 +355,9 @@ SignalR utrzymuje połączenie, przez które API przesyła do przeglądarki zdar
 
    `Execution time` pojawia się po zmianie statusu ze `streaming`, także dla nieudanego modelu. Liczniki tokenów są pokazywane dla `completed`; `?? 'N/A'` zachowuje prawdziwe zero i pokazuje brak danych tylko wtedy, gdy licznik jest niedostępny.
 
-   Serwis składa pełną dotychczasową odpowiedź HTML, którą komponent przy każdym odświeżeniu przekazuje do [sanitizeAnswerHtml](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/tree/main/src/AIChat.Web/src/services/htmlSanitizer.ts). Funkcja parsuje tekst przez `DOMParser`, usuwa zablokowane elementy i ogranicza tagi, atrybuty, klasy oraz linki do reguł z `Environment`. Tak przygotowany fragment trafia do `dangerouslySetInnerHTML`, co pozwala wyświetlać nagłówki, listy, tabele i bloki kodu otrzymane od modelu.
+   Serwis składa pełną dotychczasową odpowiedź HTML, którą komponent przy każdym odświeżeniu przekazuje do [sanitizeAnswerHtml](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/tree/main/src/AIChat.Web/src/services/htmlSanitizer.ts). Funkcja parsuje tekst przez `DOMParser`, usuwa zablokowane elementy i ogranicza tagi, atrybuty, klasy oraz linki zgodnie z regułami z `Environment`. Tak przygotowany fragment trafia do `dangerouslySetInnerHTML`, co pozwala wyświetlać nagłówki, listy, tabele i bloki kodu otrzymane od modelu.
 
-   `isLoading` jest jednocześnie używane w `disabled` pola i przycisku oraz w napisie „Streaming...”. Po zakończeniu wszystkich modeli stan przechodzi na `false`, a użytkownik może wysłać następne pytanie.
+   `isLoading` jest jednocześnie używane w `disabled` pola i przycisku oraz w napisie „Streaming...”. Po zakończeniu odpowiedzi wszystkich modeli stan przechodzi na `false`, a użytkownik może wysłać następne pytanie.
 
 1. **Błędy i zamykanie widoku mają własną obsługę.**
 
@@ -483,7 +519,7 @@ SignalR utrzymuje połączenie, przez które API przesyła do przeglądarki zdar
 
    Ustawienia `Endpoint`, `ApiKey` i `DeploymentNames` definiuje [AzureOpenAIOptions.cs](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/tree/main/src/AiChat.Api/Options/AzureOpenAIOptions.cs). W tym kodzie klient uwierzytelnia się przez `ApiKeyCredential`, a `NetworkTimeout` ustawiono na pięć minut.
 
-   Metoda `AskQuestionsStreamingAsync` ma dwa etapy: najpierw zapowiada wszystkie modele, potem uruchamia ich odpowiedzi:
+   Metoda `AskQuestionsStreamingAsync` ma dwa etapy: najpierw zapowiada wszystkie modele, potem uruchamia generowanie ich odpowiedzi:
 
    ```csharp
    public async Task AskQuestionsStreamingAsync(
@@ -649,8 +685,36 @@ SignalR utrzymuje połączenie, przez które API przesyła do przeglądarki zdar
 
    `ResponseFailed` pozwala UI zachować dotychczasowy tekst, pokazać błąd przy właściwym modelu i zakończyć jego stan `streaming`. Pozostałe zadania modeli mogą dalej dostarczać swoje fragmenty i wyniki.
 
-## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i ile tokenów jest wykorzystywane przez 3 różne modele.
-Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami, ile tokenów wykorzystują oraz jakie są koszty poszczególnych zapytań. Trzeba przy tym pamiętać, że liczba zużytych tokenów może się różnić, dlatego przedstawione wyniki mogą być inne niż wyniki zaobserwowane na innych środowiskach.
+## Uruchomienie projektu lokalnie
+
+Do uruchomienia potrzebne są .NET 10 SDK, Node.js 22.12 lub nowszy z npm oraz wdrożenia modeli w Azure AI Foundry. Polecenia wykonaj w dwóch terminalach, zaczynając w każdym z głównego katalogu sklonowanego repozytorium.
+
+1. **Uruchom API.** W [appsettings.json](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/tree/main/src/AiChat.Api/appsettings.json) sprawdź, czy `AzureOpenAI:DeploymentNames` zawiera nazwy Twoich wdrożeń. Ustaw endpoint Azure OpenAI i klucz swojego zasobu w lokalnych User Secrets, zastępując wartości w nawiasach ostrych:
+
+   ```powershell
+   cd src/AiChat.Api
+   dotnet user-secrets set "AzureOpenAI:Endpoint" "https://<nazwa-zasobu>.openai.azure.com/"
+   dotnet user-secrets set "AzureOpenAI:ApiKey" "<twoj-klucz-api>"
+   dotnet run --launch-profile AiChat.Api
+   ```
+
+   API uruchomi się pod adresem `http://localhost:5000`, zgodnie z profilem projektu.
+
+1. **Uruchom UI w drugim terminalu.**
+
+   ```powershell
+   cd src/AIChat.Web
+   npm ci
+   npm run dev -- --port 5173 --strictPort
+   ```
+
+   Port `5173` odpowiada konfiguracji CORS w API, a `--strictPort` zapobiega automatycznej zmianie portu, gdy jest on zajęty.
+
+Otwórz `http://localhost:5173`, wpisz pytanie i kliknij „Send”. Pozostaw oba terminale uruchomione podczas korzystania z aplikacji.
+
+## Analiza 4 pytań od użytkownika wraz z analizą jakości odpowiedzi, kosztów i liczby tokenów wykorzystywanych przez 3 różne modele
+
+Przedstawię poniżej analizę tego, jak różne LLM-y radzą sobie z pytaniami, ile tokenów wykorzystują oraz jakie są koszty poszczególnych zapytań. Trzeba przy tym pamiętać, że liczba zużytych tokenów może się różnić, dlatego przedstawione wyniki mogą być inne niż wyniki zaobserwowane w innych środowiskach.
 
 
 ## Analiza modeli
@@ -684,6 +748,8 @@ Takie podejście pozwala zachować czytelność samego artykułu, a jednocześni
 
    <img width="1906" height="370" alt="image" src="https://github.com/user-attachments/assets/277af9ab-6db3-4703-b592-bdd29df3ea78" />
 
+   *Rysunek 12. Wyniki pytania o aplikację Hello World: odpowiedzi trzech modeli, czasy wykonania i zużycie tokenów.*
+
    Wyniki są następujące:
 
    | Model | Pełna odpowiedź | Tokeny wejściowe | Tokeny wyjściowe | Tokeny łącznie | Koszt łączny (EUR) |
@@ -701,6 +767,8 @@ Takie podejście pozwala zachować czytelność samego artykułu, a jednocześni
    Stwórz proste REST API w ASP.NET Core do zarządzania listą produktów. Dodaj endpointy GET, POST i DELETE. Użyj kontrolerów, Dependency Injection, async/await oraz walidacji danych wejściowych. Dane mogą być przechowywane w pamięci. Pokaż wszystkie wymagane klasy oraz krótko opisz strukturę rozwiązania.
 
    <img width="1895" height="348" alt="image" src="https://github.com/user-attachments/assets/1b94c320-82c2-4e1a-9fc4-a8ec91b1d9fe" />
+
+   *Rysunek 13. Wyniki pytania o REST API produktów: czasy wykonania i liczba tokenów dla każdego modelu.*
 
    Wyniki są następujące:
 
@@ -758,7 +826,7 @@ Takie podejście pozwala zachować czytelność samego artykułu, a jednocześni
 
    [Szczegółowe porównanie odpowiedzi modeli](https://github.com/kmaraszkiewicz86/AzureAiFoundryChatDemo/blob/main/results/prompt-4/comparison.md)
 
-   **Skrót oceny:** Najlepiej wypadł **gpt-5.6-terra-medium**, nieznacznie wyprzedzając **gpt-5.6-sol-high**. Terra najlepiej rozróżnił sytuację, w której repozytorium pozostaje synchroniczne, od rzeczywistego asynchronicznego I/O i uwzględnił możliwość zachowania istniejącego kontraktu `Task`. Sol poprawnie wyjaśnił asynchroniczne I/O i propagowanie anulowania, ale dodał więcej kodu niż wymagał prosty refactoring oraz nieuzasadnioną regułę wymagającą dodatniego ID. Mini był najtańszy i najkrótszy, lecz jego preferowana poprawka zmieniała zachowanie metody przy braku produktu i pomijała istotne różnice w sposobie propagowania wyjątków.
+   **Skrót oceny:** Najlepiej wypadł **gpt-5.6-terra-medium**, nieznacznie wyprzedzając **gpt-5.6-sol-high**. Terra najlepiej rozróżnił sytuację, w której repozytorium pozostaje synchroniczne, od rzeczywistego asynchronicznego I/O i uwzględnił możliwość zachowania istniejącego kontraktu `Task`. Sol poprawnie wyjaśnił asynchroniczne I/O i propagowanie anulowania, ale dodał więcej kodu niż wymagała prosta refaktoryzacja oraz nieuzasadnioną regułę wymagającą dodatniego ID. Mini był najtańszy i najkrótszy, lecz jego preferowana poprawka zmieniała zachowanie metody przy braku produktu i pomijała istotne różnice w sposobie propagowania wyjątków.
 
 ## Końcowe podsumowanie
 
@@ -786,11 +854,11 @@ Poniżej znajduje się lista źródeł wykorzystanych podczas tworzenia artykuł
 
 1. **Microsoft Azure Portal**  
    https://portal.azure.com/  
-   Wykorzystane do utworzenia zasobu Microsoft Foundry oraz konfiguracji modeli używanych w projekcie.
+   Wykorzystany do utworzenia zasobu Microsoft Foundry oraz konfiguracji modeli używanych w projekcie.
 
 2. **Azure OpenAI Service Pricing**  
    https://azure.microsoft.com/en-us/pricing/details/azure-openai/  
-   Wykorzystane do sprawdzenia aktualnych cen tokenów dla modeli:
+   Wykorzystany do sprawdzenia aktualnych cen tokenów dla modeli:
    - `gpt-5.4-mini`
    - `gpt-5.6-terra`
    - `gpt-5.6-sol`
