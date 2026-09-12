@@ -1,21 +1,35 @@
-<article class="streaming-response"><strong>Model:</strong> <u>gpt-5.6-sol-high</u><p><strong>Execution time:</strong> 171936 ms</p><p><strong>Input tokens:</strong> 1135</p><p><strong>Output tokens:</strong> 15206</p><p><strong>Total tokens:</strong> 16341</p><p><strong>Question:</strong> Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.</p><div><p><strong>Answer:</strong></p><div><div class="vertical-stack">
-<section class="vertical-stack-item">
-<h2>Przegląd rozwiązania</h2>
-<p>Rozwiązanie wykorzystuje ASP.NET Core Minimal API na .NET 10, PostgreSQL jako źródło prawdy, Redis jako rozproszony cache oraz Entity Framework Core. Endpoint tworzenia zamówienia jest asynchroniczny, idempotentny i bezpieczny przy wielu równoległych żądaniach.</p>
-<ul>
-<li><strong>API:</strong> stateless ASP.NET Core, możliwe poziome skalowanie wielu instancji.</li>
-<li><strong>Baza danych:</strong> PostgreSQL, transakcje, atomowa rezerwacja magazynu i ograniczenia unikalności.</li>
-<li><strong>Cache:</strong> Redis z cache-aside; baza pozostaje źródłem prawdy.</li>
-<li><strong>Odporność na duplikaty:</strong> wymagany nagłówek <code>Idempotency-Key</code>.</li>
-<li><strong>Bezpieczeństwo:</strong> JWT Bearer, autoryzacja domyślna, rate limiting, walidacja danych i brak zaufania do identyfikatora klienta z payloadu.</li>
-<li><strong>Diagnostyka:</strong> strukturalne logi JSON, trace ID, OpenTelemetry, OTLP oraz health checks.</li>
-<li><strong>Obsługa błędów:</strong> spójne odpowiedzi RFC 7807 Problem Details.</li>
-</ul>
-</section>
+# Model: gpt-5.6-sol-high
 
-<section class="vertical-stack-item">
-<h2>Architektura</h2>
-<pre><code class="language-text">Klient
+**Execution time:** 171936 ms
+
+**Input tokens:** 1135
+
+**Output tokens:** 15206
+
+**Total tokens:** 16341
+
+## Question
+
+Zaprojektuj produkcyjne REST API w ASP.NET Core do obsługi zamówień. API powinno obsługiwać dużą liczbę równoległych requestów. Zaproponuj architekturę rozwiązania, sposób przechowywania danych, strategię cache, obsługę błędów, logging, monitoring oraz zabezpieczenia. Następnie pokaż przykładową implementację endpointu tworzącego zamówienie wraz z warstwą serwisową. Wyjaśnij najważniejsze decyzje architektoniczne oraz ich zalety i wady.
+
+## Answer
+
+### Przegląd rozwiązania
+
+Rozwiązanie wykorzystuje ASP.NET Core Minimal API na .NET 10, PostgreSQL jako źródło prawdy, Redis jako rozproszony cache oraz Entity Framework Core. Endpoint tworzenia zamówienia jest asynchroniczny, idempotentny i bezpieczny przy wielu równoległych żądaniach.
+
+- **API:** stateless ASP.NET Core, możliwe poziome skalowanie wielu instancji.
+- **Baza danych:** PostgreSQL, transakcje, atomowa rezerwacja magazynu i ograniczenia unikalności.
+- **Cache:** Redis z cache-aside; baza pozostaje źródłem prawdy.
+- **Odporność na duplikaty:** wymagany nagłówek `Idempotency-Key`.
+- **Bezpieczeństwo:** JWT Bearer, autoryzacja domyślna, rate limiting, walidacja danych i brak zaufania do identyfikatora klienta z payloadu.
+- **Diagnostyka:** strukturalne logi JSON, trace ID, OpenTelemetry, OTLP oraz health checks.
+- **Obsługa błędów:** spójne odpowiedzi RFC 7807 Problem Details.
+
+### Architektura
+
+```text
+Klient
   |
   | HTTPS + JWT + Idempotency-Key
   v
@@ -32,39 +46,39 @@ Wiele instancji Orders.Api
   +-- Redis cache-aside
   +-- OpenTelemetry
   |
-  +----------&gt; PostgreSQL
+  +----------> PostgreSQL
   |             - zamówienia
   |             - pozycje zamówień
   |             - produkty i stan magazynowy
   |             - klucze idempotencji
   |
-  +----------&gt; Redis
+  +----------> Redis
   |
-  +----------&gt; OTLP Collector
+  +----------> OTLP Collector
                 - metryki
                 - trace'y
-                - eksport do Prometheus/Grafana/Tempo/Jaeger</code></pre>
+                - eksport do Prometheus/Grafana/Tempo/Jaeger
+```
 
-<h3>Model współbieżności</h3>
-<p>Stan magazynowy jest zmniejszany jednym atomowym poleceniem SQL odpowiadającym warunkowi <code>Stock &gt;= Quantity</code>. Dzięki temu dwa równoległe requesty nie mogą sprzedać tej samej ostatniej sztuki. Całe zamówienie jest wykonywane w transakcji o poziomie izolacji <code>RepeatableRead</code>. W przypadku konfliktu serializacji strategia wykonania Npgsql ponawia transakcję.</p>
-<p>Klucz idempotencji jest kluczem głównym tabeli. Dwa równoległe requesty z tym samym kluczem są rozstrzygane przez ograniczenie unikalności PostgreSQL, a nie przez blokadę w pamięci procesu. Mechanizm działa z wieloma instancjami API.</p>
-</section>
+#### Model współbieżności
 
-<section class="vertical-stack-item">
-<h2>Wymagania</h2>
-<ul>
-<li>.NET SDK 10.0.</li>
-<li>PostgreSQL 16 lub nowszy.</li>
-<li>Redis 7 lub nowszy.</li>
-<li>Docker Compose do lokalnego uruchomienia infrastruktury.</li>
-<li>Dostawca JWT/OIDC w środowisku produkcyjnym.</li>
-<li>Opcjonalnie OpenTelemetry Collector.</li>
-</ul>
-</section>
+Stan magazynowy jest zmniejszany jednym atomowym poleceniem SQL odpowiadającym warunkowi `Stock >= Quantity`. Dzięki temu dwa równoległe requesty nie mogą sprzedać tej samej ostatniej sztuki. Całe zamówienie jest wykonywane w transakcji o poziomie izolacji `RepeatableRead`. W przypadku konfliktu serializacji strategia wykonania Npgsql ponawia transakcję.
 
-<section class="vertical-stack-item">
-<h2>Struktura projektu</h2>
-<pre><code class="language-text">Orders/
+Klucz idempotencji jest kluczem głównym tabeli. Dwa równoległe requesty z tym samym kluczem są rozstrzygane przez ograniczenie unikalności PostgreSQL, a nie przez blokadę w pamięci procesu. Mechanizm działa z wieloma instancjami API.
+
+### Wymagania
+
+- .NET SDK 10.0.
+- PostgreSQL 16 lub nowszy.
+- Redis 7 lub nowszy.
+- Docker Compose do lokalnego uruchomienia infrastruktury.
+- Dostawca JWT/OIDC w środowisku produkcyjnym.
+- Opcjonalnie OpenTelemetry Collector.
+
+### Struktura projektu
+
+```text
+Orders/
 ├── docker-compose.yml
 └── src/
     └── Orders.Api/
@@ -86,40 +100,44 @@ Wiele instancji Orders.Api
         ├── Services/
         │   └── OrderService.cs
         └── Validation/
-            └── CreateOrderRequestValidator.cs</code></pre>
-</section>
+            └── CreateOrderRequestValidator.cs
+```
 
-<section class="vertical-stack-item">
-<h2>Implementacja</h2>
+### Implementacja
 
-<h3>src/Orders.Api/Orders.Api.csproj</h3>
-<pre><code class="language-xml">&lt;Project Sdk="Microsoft.NET.Sdk.Web"&gt;
-  &lt;PropertyGroup&gt;
-    &lt;TargetFramework&gt;net10.0&lt;/TargetFramework&gt;
-    &lt;Nullable&gt;enable&lt;/Nullable&gt;
-    &lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;
-    &lt;InvariantGlobalization&gt;false&lt;/InvariantGlobalization&gt;
-  &lt;/PropertyGroup&gt;
+#### src/Orders.Api/Orders.Api.csproj
 
-  &lt;ItemGroup&gt;
-    &lt;PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" /&gt;
-    &lt;PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0"&gt;
-      &lt;PrivateAssets&gt;all&lt;/PrivateAssets&gt;
-      &lt;IncludeAssets&gt;runtime; build; native; contentfiles; analyzers; buildtransitive&lt;/IncludeAssets&gt;
-    &lt;/PackageReference&gt;
-    &lt;PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" /&gt;
-    &lt;PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" /&gt;
-    &lt;PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.14.0" /&gt;
-    &lt;PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0" /&gt;
-    &lt;PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0" /&gt;
-    &lt;PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0" /&gt;
-    &lt;PackageReference Include="StackExchange.Redis" Version="2.8.58" /&gt;
-  &lt;/ItemGroup&gt;
-&lt;/Project&gt;</code></pre>
+```xml
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
 
-<h3>src/Orders.Api/Program.cs</h3>
-<pre><code class="language-csharp">using System.Diagnostics;
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.14.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.58" />
+  </ItemGroup>
+</Project>
+```
+
+#### src/Orders.Api/Program.cs
+
+```csharp
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -145,7 +163,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.ClearProviders();
 builder.Logging.AddJsonConsole();
-builder.Logging.Configure(options =&gt;
+builder.Logging.Configure(options =>
 {
     options.ActivityTrackingOptions =
         ActivityTrackingOptions.TraceId |
@@ -154,14 +172,14 @@ builder.Logging.Configure(options =&gt;
 });
 
 builder.Services.AddProblemDetails();
-builder.Services.AddExceptionHandler&lt;ApiExceptionHandler&gt;();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
 var postgresConnection = builder.Configuration.GetConnectionString("Postgres")
     ?? throw new InvalidOperationException("Missing Postgres connection string.");
 
-builder.Services.AddDbContextPool&lt;OrdersDbContext&gt;(options =&gt;
+builder.Services.AddDbContextPool<OrdersDbContext>(options =>
 {
-    options.UseNpgsql(postgresConnection, npgsql =&gt;
+    options.UseNpgsql(postgresConnection, npgsql =>
     {
         npgsql.EnableRetryOnFailure(
             maxRetryCount: 3,
@@ -176,10 +194,10 @@ builder.Services.AddDbContextPool&lt;OrdersDbContext&gt;(options =&gt;
 var redisConnection = builder.Configuration.GetConnectionString("Redis")
     ?? throw new InvalidOperationException("Missing Redis connection string.");
 
-builder.Services.AddSingleton&lt;IConnectionMultiplexer&gt;(
-    _ =&gt; ConnectionMultiplexer.Connect(redisConnection));
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    _ => ConnectionMultiplexer.Connect(redisConnection));
 
-builder.Services.AddStackExchangeRedisCache(options =&gt;
+builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.Configuration = redisConnection;
     options.InstanceName = "orders-api:";
@@ -190,7 +208,7 @@ var signingKey = builder.Configuration["Jwt:SigningKey"]
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =&gt;
+    .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
         options.RequireHttpsMetadata = true;
@@ -216,12 +234,12 @@ builder.Services
         .RequireAuthenticatedUser()
         .Build());
 
-builder.Services.AddRateLimiter(options =&gt;
+builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.GlobalLimiter = PartitionedRateLimiter.Create&lt;HttpContext, string&gt;(
-        context =&gt;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        context =>
         {
             var partitionKey =
                 context.User.FindFirstValue("sub")
@@ -230,7 +248,7 @@ builder.Services.AddRateLimiter(options =&gt;
 
             return RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey,
-                _ =&gt; new FixedWindowRateLimiterOptions
+                _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 100,
                     Window = TimeSpan.FromSeconds(1),
@@ -240,7 +258,7 @@ builder.Services.AddRateLimiter(options =&gt;
         });
 });
 
-builder.Services.AddHttpLogging(options =&gt;
+builder.Services.AddHttpLogging(options =>
 {
     options.LoggingFields =
         HttpLoggingFields.RequestMethod |
@@ -249,26 +267,26 @@ builder.Services.AddHttpLogging(options =&gt;
         HttpLoggingFields.Duration;
 });
 
-builder.Services.AddValidatorsFromAssemblyContaining&lt;CreateOrderRequestValidator&gt;();
-builder.Services.AddScoped&lt;IOrderService, OrderService&gt;();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateOrderRequestValidator>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 
 builder.Services.AddHealthChecks()
-    .AddCheck&lt;DatabaseHealthCheck&gt;("postgres", tags: ["ready"])
-    .AddCheck&lt;RedisHealthCheck&gt;("redis", tags: ["ready"]);
+    .AddCheck<DatabaseHealthCheck>("postgres", tags: ["ready"])
+    .AddCheck<RedisHealthCheck>("redis", tags: ["ready"]);
 
 builder.Services
     .AddOpenTelemetry()
-    .ConfigureResource(resource =&gt; resource.AddService(
+    .ConfigureResource(resource => resource.AddService(
         serviceName: "orders-api",
         serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString()))
-    .WithTracing(tracing =&gt; tracing
-        .AddAspNetCoreInstrumentation(options =&gt;
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(options =>
         {
-            options.Filter = context =&gt;
+            options.Filter = context =>
                 !context.Request.Path.StartsWithSegments("/health");
         })
         .AddOtlpExporter())
-    .WithMetrics(metrics =&gt; metrics
+    .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddOtlpExporter());
@@ -283,22 +301,25 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
-    Predicate = _ =&gt; false
+    Predicate = _ => false
 }).AllowAnonymous();
 
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = registration =&gt; registration.Tags.Contains("ready")
+    Predicate = registration => registration.Tags.Contains("ready")
 }).AllowAnonymous();
 
 app.MapOrderEndpoints();
 
 app.Run();
 
-public partial class Program;</code></pre>
+public partial class Program;
+```
 
-<h3>src/Orders.Api/Domain/Entities.cs</h3>
-<pre><code class="language-csharp">namespace Orders.Api.Domain;
+#### src/Orders.Api/Domain/Entities.cs
+
+```csharp
+namespace Orders.Api.Domain;
 
 public enum OrderStatus
 {
@@ -324,7 +345,7 @@ public sealed class Order
     public OrderStatus Status { get; set; }
     public decimal TotalAmount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public List&lt;OrderLine&gt; Lines { get; set; } = [];
+    public List<OrderLine> Lines { get; set; } = [];
 }
 
 public sealed class OrderLine
@@ -345,13 +366,16 @@ public sealed class IdempotencyRecord
     public required string RequestHash { get; set; }
     public Guid? OrderId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/Contracts/OrderContracts.cs</h3>
-<pre><code class="language-csharp">namespace Orders.Api.Contracts;
+#### src/Orders.Api/Contracts/OrderContracts.cs
+
+```csharp
+namespace Orders.Api.Contracts;
 
 public sealed record CreateOrderRequest(
-    IReadOnlyCollection&lt;CreateOrderLineRequest&gt; Lines);
+    IReadOnlyCollection<CreateOrderLineRequest> Lines);
 
 public sealed record CreateOrderLineRequest(
     Guid ProductId,
@@ -363,7 +387,7 @@ public sealed record OrderResponse(
     string Status,
     decimal TotalAmount,
     DateTimeOffset CreatedAt,
-    IReadOnlyCollection&lt;OrderLineResponse&gt; Lines);
+    IReadOnlyCollection<OrderLineResponse> Lines);
 
 public sealed record OrderLineResponse(
     Guid ProductId,
@@ -374,117 +398,126 @@ public sealed record OrderLineResponse(
 
 public sealed record CreateOrderResult(
     OrderResponse Order,
-    bool IsReplay);</code></pre>
+    bool IsReplay);
+```
 
-<h3>src/Orders.Api/Persistence/OrdersDbContext.cs</h3>
-<pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+#### src/Orders.Api/Persistence/OrdersDbContext.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
 using Orders.Api.Domain;
 
 namespace Orders.Api.Persistence;
 
-public sealed class OrdersDbContext(DbContextOptions&lt;OrdersDbContext&gt; options)
+public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options)
     : DbContext(options)
 {
-    public DbSet&lt;Order&gt; Orders =&gt; Set&lt;Order&gt;();
-    public DbSet&lt;OrderLine&gt; OrderLines =&gt; Set&lt;OrderLine&gt;();
-    public DbSet&lt;Product&gt; Products =&gt; Set&lt;Product&gt;();
-    public DbSet&lt;IdempotencyRecord&gt; IdempotencyRecords =&gt;
-        Set&lt;IdempotencyRecord&gt;();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderLine> OrderLines => Set<OrderLine>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<IdempotencyRecord> IdempotencyRecords =>
+        Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity&lt;Product&gt;(entity =&gt;
+        modelBuilder.Entity<Product>(entity =>
         {
             entity.ToTable("products");
-            entity.HasKey(x =&gt; x.Id);
-            entity.Property(x =&gt; x.Name).HasMaxLength(200).IsRequired();
-            entity.Property(x =&gt; x.UnitPrice).HasPrecision(18, 2);
-            entity.Property(x =&gt; x.Stock).IsRequired();
-            entity.HasIndex(x =&gt; x.IsActive);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            entity.Property(x => x.Stock).IsRequired();
+            entity.HasIndex(x => x.IsActive);
         });
 
-        modelBuilder.Entity&lt;Order&gt;(entity =&gt;
+        modelBuilder.Entity<Order>(entity =>
         {
             entity.ToTable("orders");
-            entity.HasKey(x =&gt; x.Id);
-            entity.Property(x =&gt; x.Number).HasMaxLength(50).IsRequired();
-            entity.HasIndex(x =&gt; x.Number).IsUnique();
-            entity.HasIndex(x =&gt; new { x.CustomerId, x.CreatedAt });
-            entity.Property(x =&gt; x.Status)
-                .HasConversion&lt;string&gt;()
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Number).HasMaxLength(50).IsRequired();
+            entity.HasIndex(x => x.Number).IsUnique();
+            entity.HasIndex(x => new { x.CustomerId, x.CreatedAt });
+            entity.Property(x => x.Status)
+                .HasConversion<string>()
                 .HasMaxLength(30);
-            entity.Property(x =&gt; x.TotalAmount).HasPrecision(18, 2);
+            entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
 
-            entity.HasMany(x =&gt; x.Lines)
-                .WithOne(x =&gt; x.Order)
-                .HasForeignKey(x =&gt; x.OrderId)
+            entity.HasMany(x => x.Lines)
+                .WithOne(x => x.Order)
+                .HasForeignKey(x => x.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity&lt;OrderLine&gt;(entity =&gt;
+        modelBuilder.Entity<OrderLine>(entity =>
         {
             entity.ToTable("order_lines");
-            entity.HasKey(x =&gt; x.Id);
-            entity.Property(x =&gt; x.ProductName).HasMaxLength(200).IsRequired();
-            entity.Property(x =&gt; x.UnitPrice).HasPrecision(18, 2);
-            entity.Property(x =&gt; x.LineAmount).HasPrecision(18, 2);
-            entity.HasIndex(x =&gt; x.OrderId);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ProductName).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            entity.Property(x => x.LineAmount).HasPrecision(18, 2);
+            entity.HasIndex(x => x.OrderId);
         });
 
-        modelBuilder.Entity&lt;IdempotencyRecord&gt;(entity =&gt;
+        modelBuilder.Entity<IdempotencyRecord>(entity =>
         {
             entity.ToTable("idempotency_records");
-            entity.HasKey(x =&gt; x.Key)
+            entity.HasKey(x => x.Key)
                 .HasName("pk_idempotency_records");
-            entity.Property(x =&gt; x.Key).HasMaxLength(128);
-            entity.Property(x =&gt; x.RequestHash).HasMaxLength(64).IsRequired();
-            entity.HasIndex(x =&gt; x.CreatedAt);
+            entity.Property(x => x.Key).HasMaxLength(128);
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.HasIndex(x => x.CreatedAt);
         });
     }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/Validation/CreateOrderRequestValidator.cs</h3>
-<pre><code class="language-csharp">using FluentValidation;
+#### src/Orders.Api/Validation/CreateOrderRequestValidator.cs
+
+```csharp
+using FluentValidation;
 using Orders.Api.Contracts;
 
 namespace Orders.Api.Validation;
 
 public sealed class CreateOrderRequestValidator
-    : AbstractValidator&lt;CreateOrderRequest&gt;
+    : AbstractValidator<CreateOrderRequest>
 {
     public CreateOrderRequestValidator()
     {
-        RuleFor(x =&gt; x.Lines)
+        RuleFor(x => x.Lines)
             .NotNull()
             .NotEmpty()
-            .Must(lines =&gt; lines.Count &lt;= 100)
+            .Must(lines => lines.Count <= 100)
             .WithMessage("An order can contain at most 100 lines.")
             .Must(HaveUniqueProducts)
             .WithMessage("A product can appear only once in an order.");
 
-        RuleForEach(x =&gt; x.Lines)
+        RuleForEach(x => x.Lines)
             .SetValidator(new CreateOrderLineRequestValidator());
     }
 
     private static bool HaveUniqueProducts(
-        IReadOnlyCollection&lt;CreateOrderLineRequest&gt; lines)
+        IReadOnlyCollection<CreateOrderLineRequest> lines)
     {
-        return lines.Select(x =&gt; x.ProductId).Distinct().Count() == lines.Count;
+        return lines.Select(x => x.ProductId).Distinct().Count() == lines.Count;
     }
 }
 
 public sealed class CreateOrderLineRequestValidator
-    : AbstractValidator&lt;CreateOrderLineRequest&gt;
+    : AbstractValidator<CreateOrderLineRequest>
 {
     public CreateOrderLineRequestValidator()
     {
-        RuleFor(x =&gt; x.ProductId).NotEmpty();
-        RuleFor(x =&gt; x.Quantity).InclusiveBetween(1, 10_000);
+        RuleFor(x => x.ProductId).NotEmpty();
+        RuleFor(x => x.Quantity).InclusiveBetween(1, 10_000);
     }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/Errors/ApiExceptionHandler.cs</h3>
-<pre><code class="language-csharp">using Microsoft.AspNetCore.Diagnostics;
+#### src/Orders.Api/Errors/ApiExceptionHandler.cs
+
+```csharp
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Orders.Api.Errors;
@@ -494,34 +527,34 @@ public sealed class DomainConflictException(string message) : Exception(message)
 public sealed class ResourceNotFoundException(string message) : Exception(message);
 
 public sealed class ApiExceptionHandler(
-    ILogger&lt;ApiExceptionHandler&gt; logger) : IExceptionHandler
+    ILogger<ApiExceptionHandler> logger) : IExceptionHandler
 {
-    public async ValueTask&lt;bool&gt; TryHandleAsync(
+    public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
         CancellationToken cancellationToken)
     {
         if (exception is OperationCanceledException
-            &amp;&amp; httpContext.RequestAborted.IsCancellationRequested)
+            && httpContext.RequestAborted.IsCancellationRequested)
         {
             return false;
         }
 
         var (status, title, detail) = exception switch
         {
-            DomainConflictException conflict =&gt;
+            DomainConflictException conflict =>
                 (StatusCodes.Status409Conflict, "Conflict", conflict.Message),
 
-            ResourceNotFoundException notFound =&gt;
+            ResourceNotFoundException notFound =>
                 (StatusCodes.Status404NotFound, "Not found", notFound.Message),
 
-            _ =&gt; (
+            _ => (
                 StatusCodes.Status500InternalServerError,
                 "Internal server error",
                 "An unexpected error occurred.")
         };
 
-        if (status &gt;= 500)
+        if (status >= 500)
         {
             logger.LogError(
                 exception,
@@ -556,10 +589,13 @@ public sealed class ApiExceptionHandler(
 
         return true;
     }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/Services/OrderService.cs</h3>
-<pre><code class="language-csharp">using System.Data;
+#### src/Orders.Api/Services/OrderService.cs
+
+```csharp
+using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -576,13 +612,13 @@ namespace Orders.Api.Services;
 
 public interface IOrderService
 {
-    Task&lt;CreateOrderResult&gt; CreateAsync(
+    Task<CreateOrderResult> CreateAsync(
         Guid customerId,
         string idempotencyKey,
         CreateOrderRequest request,
         CancellationToken cancellationToken);
 
-    Task&lt;OrderResponse&gt; GetAsync(
+    Task<OrderResponse> GetAsync(
         Guid customerId,
         Guid orderId,
         CancellationToken cancellationToken);
@@ -591,16 +627,16 @@ public interface IOrderService
 public sealed class OrderService(
     OrdersDbContext db,
     IDistributedCache cache,
-    ILogger&lt;OrderService&gt; logger) : IOrderService
+    ILogger<OrderService> logger) : IOrderService
 {
     private static readonly JsonSerializerOptions CacheJsonOptions =
         new(JsonSerializerDefaults.Web);
 
     private readonly OrdersDbContext _db = db;
     private readonly IDistributedCache _cache = cache;
-    private readonly ILogger&lt;OrderService&gt; _logger = logger;
+    private readonly ILogger<OrderService> _logger = logger;
 
-    public async Task&lt;CreateOrderResult&gt; CreateAsync(
+    public async Task<CreateOrderResult> CreateAsync(
         Guid customerId,
         string idempotencyKey,
         CreateOrderRequest request,
@@ -613,7 +649,7 @@ public sealed class OrderService(
         {
             var strategy = _db.Database.CreateExecutionStrategy();
 
-            result = await strategy.ExecuteAsync(async ct =&gt;
+            result = await strategy.ExecuteAsync(async ct =>
             {
                 await using var transaction =
                     await _db.Database.BeginTransactionAsync(
@@ -622,7 +658,7 @@ public sealed class OrderService(
 
                 var existing = await _db.IdempotencyRecords
                     .AsNoTracking()
-                    .SingleOrDefaultAsync(x =&gt; x.Key == idempotencyKey, ct);
+                    .SingleOrDefaultAsync(x => x.Key == idempotencyKey, ct);
 
                 if (existing is not null)
                 {
@@ -669,14 +705,14 @@ public sealed class OrderService(
                 foreach (var requestedLine in request.Lines)
                 {
                     var affectedRows = await _db.Products
-                        .Where(product =&gt;
+                        .Where(product =>
                             product.Id == requestedLine.ProductId
-                            &amp;&amp; product.IsActive
-                            &amp;&amp; product.Stock &gt;= requestedLine.Quantity)
+                            && product.IsActive
+                            && product.Stock >= requestedLine.Quantity)
                         .ExecuteUpdateAsync(
-                            setters =&gt; setters.SetProperty(
-                                product =&gt; product.Stock,
-                                product =&gt; product.Stock - requestedLine.Quantity),
+                            setters => setters.SetProperty(
+                                product => product.Stock,
+                                product => product.Stock - requestedLine.Quantity),
                             ct);
 
                     if (affectedRows != 1)
@@ -688,8 +724,8 @@ public sealed class OrderService(
 
                     var product = await _db.Products
                         .AsNoTracking()
-                        .Where(x =&gt; x.Id == requestedLine.ProductId)
-                        .Select(x =&gt; new
+                        .Where(x => x.Id == requestedLine.ProductId)
+                        .Select(x => new
                         {
                             x.Id,
                             x.Name,
@@ -730,7 +766,7 @@ public sealed class OrderService(
 
             var existing = await _db.IdempotencyRecords
                 .AsNoTracking()
-                .SingleAsync(x =&gt; x.Key == idempotencyKey, cancellationToken);
+                .SingleAsync(x => x.Key == idempotencyKey, cancellationToken);
 
             EnsureMatchingRequest(existing, requestHash);
 
@@ -762,7 +798,7 @@ public sealed class OrderService(
         return result;
     }
 
-    public async Task&lt;OrderResponse&gt; GetAsync(
+    public async Task<OrderResponse> GetAsync(
         Guid customerId,
         Guid orderId,
         CancellationToken cancellationToken)
@@ -777,7 +813,7 @@ public sealed class OrderService(
 
             if (cached is not null)
             {
-                var response = JsonSerializer.Deserialize&lt;OrderResponse&gt;(
+                var response = JsonSerializer.Deserialize<OrderResponse>(
                     cached,
                     CacheJsonOptions);
 
@@ -804,23 +840,23 @@ public sealed class OrderService(
         return order;
     }
 
-    private async Task&lt;OrderResponse&gt; LoadFromDatabaseAsync(
+    private async Task<OrderResponse> LoadFromDatabaseAsync(
         Guid customerId,
         Guid orderId,
         CancellationToken cancellationToken)
     {
         var order = await _db.Orders
             .AsNoTracking()
-            .Where(x =&gt; x.Id == orderId &amp;&amp; x.CustomerId == customerId)
-            .Select(x =&gt; new OrderResponse(
+            .Where(x => x.Id == orderId && x.CustomerId == customerId)
+            .Select(x => new OrderResponse(
                 x.Id,
                 x.Number,
                 x.Status.ToString(),
                 x.TotalAmount,
                 x.CreatedAt,
                 x.Lines
-                    .OrderBy(line =&gt; line.Id)
-                    .Select(line =&gt; new OrderLineResponse(
+                    .OrderBy(line => line.Id)
+                    .Select(line => new OrderLineResponse(
                         line.ProductId,
                         line.ProductName,
                         line.Quantity,
@@ -868,7 +904,7 @@ public sealed class OrderService(
             order.Status.ToString(),
             order.TotalAmount,
             order.CreatedAt,
-            order.Lines.Select(line =&gt; new OrderLineResponse(
+            order.Lines.Select(line => new OrderLineResponse(
                 line.ProductId,
                 line.ProductName,
                 line.Quantity,
@@ -896,7 +932,7 @@ public sealed class OrderService(
         var canonical = new StringBuilder();
         canonical.Append(customerId.ToString("N"));
 
-        foreach (var line in request.Lines.OrderBy(x =&gt; x.ProductId))
+        foreach (var line in request.Lines.OrderBy(x => x.ProductId))
         {
             canonical
                 .Append('|')
@@ -928,10 +964,13 @@ public sealed class OrderService(
     {
         return $"order:{customerId:N}:{orderId:N}";
     }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/Endpoints/OrderEndpoints.cs</h3>
-<pre><code class="language-csharp">using System.Security.Claims;
+#### src/Orders.Api/Endpoints/OrderEndpoints.cs
+
+```csharp
+using System.Security.Claims;
 using FluentValidation;
 using Orders.Api.Contracts;
 using Orders.Api.Services;
@@ -954,10 +993,10 @@ public static class OrderEndpoints
         return endpoints;
     }
 
-    private static async Task&lt;IResult&gt; CreateOrderAsync(
+    private static async Task<IResult> CreateOrderAsync(
         HttpContext httpContext,
         CreateOrderRequest request,
-        IValidator&lt;CreateOrderRequest&gt; validator,
+        IValidator<CreateOrderRequest> validator,
         IOrderService orderService,
         CancellationToken cancellationToken)
     {
@@ -968,11 +1007,11 @@ public static class OrderEndpoints
         if (!validation.IsValid)
         {
             var errors = validation.Errors
-                .GroupBy(error =&gt; error.PropertyName)
+                .GroupBy(error => error.PropertyName)
                 .ToDictionary(
-                    group =&gt; group.Key,
-                    group =&gt; group
-                        .Select(error =&gt; error.ErrorMessage)
+                    group => group.Key,
+                    group => group
+                        .Select(error => error.ErrorMessage)
                         .Distinct()
                         .ToArray());
 
@@ -996,7 +1035,7 @@ public static class OrderEndpoints
 
         var idempotencyKey = keyValues.ToString().Trim();
 
-        if (idempotencyKey.Length is &lt; 8 or &gt; 128)
+        if (idempotencyKey.Length is < 8 or > 128)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -1018,7 +1057,7 @@ public static class OrderEndpoints
             result.Order);
     }
 
-    private static async Task&lt;IResult&gt; GetOrderAsync(
+    private static async Task<IResult> GetOrderAsync(
         Guid orderId,
         ClaimsPrincipal user,
         IOrderService orderService,
@@ -1045,10 +1084,13 @@ public static class OrderEndpoints
             user.FindFirstValue("sub"),
             out customerId);
     }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/Health/DependencyHealthChecks.cs</h3>
-<pre><code class="language-csharp">using Microsoft.EntityFrameworkCore;
+#### src/Orders.Api/Health/DependencyHealthChecks.cs
+
+```csharp
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Orders.Api.Persistence;
 using StackExchange.Redis;
@@ -1058,7 +1100,7 @@ namespace Orders.Api.Health;
 public sealed class DatabaseHealthCheck(
     OrdersDbContext dbContext) : IHealthCheck
 {
-    public async Task&lt;HealthCheckResult&gt; CheckHealthAsync(
+    public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
@@ -1083,7 +1125,7 @@ public sealed class DatabaseHealthCheck(
 public sealed class RedisHealthCheck(
     IConnectionMultiplexer redis) : IHealthCheck
 {
-    public async Task&lt;HealthCheckResult&gt; CheckHealthAsync(
+    public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
@@ -1101,10 +1143,13 @@ public sealed class RedisHealthCheck(
                 exception);
         }
     }
-}</code></pre>
+}
+```
 
-<h3>src/Orders.Api/appsettings.json</h3>
-<pre><code class="language-json">{
+#### src/Orders.Api/appsettings.json
+
+```json
+{
   "ConnectionStrings": {
     "Postgres": "Host=localhost;Port=5432;Database=orders;Username=orders;Password=orders_dev_password;Maximum Pool Size=200;Minimum Pool Size=10;Timeout=5;Command Timeout=10",
     "Redis": "localhost:6379,abortConnect=false,connectTimeout=3000,syncTimeout=3000"
@@ -1132,10 +1177,13 @@ public sealed class RedisHealthCheck(
   },
   "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
   "AllowedHosts": "*"
-}</code></pre>
+}
+```
 
-<h3>docker-compose.yml</h3>
-<pre><code class="language-yaml">services:
+#### docker-compose.yml
+
+```yaml
+services:
   postgres:
     image: postgres:16-alpine
     environment:
@@ -1167,13 +1215,15 @@ public sealed class RedisHealthCheck(
 
 volumes:
   orders-postgres:
-  orders-redis:</code></pre>
-</section>
+  orders-redis:
+```
 
-<section class="vertical-stack-item">
-<h2>Utworzenie bazy i uruchomienie</h2>
-<p>Migracji nie należy wykonywać automatycznie podczas startu każdej repliki API. Przy wielu instancjach prowadziłoby to do wyścigów i niekontrolowanych zmian schematu. Migracje powinny być wersjonowane i uruchamiane jako osobny krok deploymentu.</p>
-<pre><code class="language-bash">docker compose up -d
+### Utworzenie bazy i uruchomienie
+
+Migracji nie należy wykonywać automatycznie podczas startu każdej repliki API. Przy wielu instancjach prowadziłoby to do wyścigów i niekontrolowanych zmian schematu. Migracje powinny być wersjonowane i uruchamiane jako osobny krok deploymentu.
+
+```bash
+docker compose up -d
 
 dotnet tool install --global dotnet-ef --version 10.0.0
 
@@ -1188,27 +1238,37 @@ dotnet ef database update \
   --project src/Orders.Api/Orders.Api.csproj \
   --startup-project src/Orders.Api/Orders.Api.csproj
 
-dotnet run --project src/Orders.Api/Orders.Api.csproj</code></pre>
-<p>Wygenerowany katalog <code>Persistence/Migrations</code> należy zatwierdzić w repozytorium. Na środowisku produkcyjnym można wygenerować idempotentny skrypt:</p>
-<pre><code class="language-bash">dotnet ef migrations script --idempotent \
+dotnet run --project src/Orders.Api/Orders.Api.csproj
+```
+
+Wygenerowany katalog `Persistence/Migrations` należy zatwierdzić w repozytorium. Na środowisku produkcyjnym można wygenerować idempotentny skrypt:
+
+```bash
+dotnet ef migrations script --idempotent \
   --project src/Orders.Api/Orders.Api.csproj \
   --startup-project src/Orders.Api/Orders.Api.csproj \
-  --output artifacts/orders-migration.sql</code></pre>
-</section>
+  --output artifacts/orders-migration.sql
+```
 
-<section class="vertical-stack-item">
-<h2>Przykładowe dane i test endpointu</h2>
-<h3>Dodanie produktów</h3>
-<pre><code class="language-bash">docker compose exec postgres psql -U orders -d orders -c '
+### Przykładowe dane i test endpointu
+
+#### Dodanie produktów
+
+```bash
+docker compose exec postgres psql -U orders -d orders -c '
 INSERT INTO products ("Id", "Name", "UnitPrice", "Stock", "IsActive")
 VALUES
   ('11111111-1111-1111-1111-111111111111', 'Klawiatura', 299.99, 100, TRUE),
   ('22222222-2222-2222-2222-222222222222', 'Mysz', 149.50, 200, TRUE);
-'</code></pre>
+'
+```
 
-<h3>Utworzenie zamówienia</h3>
-<p>Zmienna <code>TOKEN</code> powinna zawierać JWT wystawiony przez skonfigurowanego dostawcę tożsamości. Claim <code>sub</code> musi być identyfikatorem klienta w formacie UUID.</p>
-<pre><code class="language-bash">curl -i http://localhost:5000/api/orders \
+#### Utworzenie zamówienia
+
+Zmienna `TOKEN` powinna zawierać JWT wystawiony przez skonfigurowanego dostawcę tożsamości. Claim `sub` musi być identyfikatorem klienta w formacie UUID.
+
+```bash
+curl -i http://localhost:5000/api/orders \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: 97874439-4c21-4f68-a917-a4e010468ec3" \
@@ -1223,16 +1283,24 @@ VALUES
         "quantity": 1
       }
     ]
-  }'</code></pre>
-<p>Ponowienie identycznego requestu z tym samym kluczem zwraca to samo zamówienie oraz nagłówek <code>Idempotent-Replay: true</code>. Użycie tego samego klucza z innym payloadem zwraca <code>409 Conflict</code>.</p>
+  }'
+```
 
-<h3>Health checks</h3>
-<pre><code class="language-bash">curl -i http://localhost:5000/health/live
-curl -i http://localhost:5000/health/ready</code></pre>
+Ponowienie identycznego requestu z tym samym kluczem zwraca to samo zamówienie oraz nagłówek `Idempotent-Replay: true`. Użycie tego samego klucza z innym payloadem zwraca `409 Conflict`.
 
-<h3>Test współbieżności</h3>
-<p>Test integracyjny powinien wysłać wiele równoległych requestów na produkt z małym stanem magazynowym i sprawdzić, że liczba zaakceptowanych sztuk nigdy nie przekroczy stanu początkowego. Osobny test powinien wysłać ten sam klucz idempotencji z wielu połączeń i potwierdzić, że powstał dokładnie jeden rekord zamówienia.</p>
-<pre><code class="language-bash">seq 1 50 | xargs -P 20 -I {} curl -s -o /dev/null -w "%{http_code}\n" \
+#### Health checks
+
+```bash
+curl -i http://localhost:5000/health/live
+curl -i http://localhost:5000/health/ready
+```
+
+#### Test współbieżności
+
+Test integracyjny powinien wysłać wiele równoległych requestów na produkt z małym stanem magazynowym i sprawdzić, że liczba zaakceptowanych sztuk nigdy nie przekroczy stanu początkowego. Osobny test powinien wysłać ten sam klucz idempotencji z wielu połączeń i potwierdzić, że powstał dokładnie jeden rekord zamówienia.
+
+```bash
+seq 1 50 | xargs -P 20 -I {} curl -s -o /dev/null -w "%{http_code}\n" \
   http://localhost:5000/api/orders \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -1244,176 +1312,90 @@ curl -i http://localhost:5000/health/ready</code></pre>
         "quantity": 3
       }
     ]
-  }'</code></pre>
-</section>
+  }'
+```
 
-<section class="vertical-stack-item">
-<h2>Przebieg tworzenia zamówienia</h2>
-<ol>
-<li>Middleware uwierzytelnia JWT i odrzuca przekroczenie limitu requestów.</li>
-<li>Endpoint waliduje payload i nagłówek <code>Idempotency-Key</code>.</li>
-<li>Identyfikator klienta jest pobierany wyłącznie z podpisanego claimu <code>sub</code>.</li>
-<li>Serwis oblicza deterministyczny SHA-256 z klienta i znormalizowanej listy pozycji.</li>
-<li>Rozpoczynana jest transakcja PostgreSQL.</li>
-<li>Klucz idempotencji jest zapisywany przed właściwym zamówieniem.</li>
-<li>Dla każdej pozycji wykonywana jest atomowa aktualizacja stanu magazynowego.</li>
-<li>Ceny i nazwy produktów są kopiowane do pozycji zamówienia, dzięki czemu późniejsza zmiana katalogu nie modyfikuje historii.</li>
-<li>Zamówienie i identyfikator rezultatu idempotencji są zapisywane w tej samej transakcji.</li>
-<li>Po zatwierdzeniu odpowiedź jest zapisywana w Redis. Błąd Redis nie wycofuje zamówienia.</li>
-<li>Odpowiedź <code>201 Created</code> zawiera adres zasobu w nagłówku <code>Location</code>.</li>
-</ol>
-</section>
+### Przebieg tworzenia zamówienia
 
-<section class="vertical-stack-item">
-<h2>Cache</h2>
-<ul>
-<li><strong>Wzorzec:</strong> cache-aside dla odczytu zamówienia.</li>
-<li><strong>Klucz:</strong> zawiera identyfikator klienta i zamówienia, co ogranicza ryzyko przecieku między klientami.</li>
-<li><strong>TTL:</strong> 10 minut absolutnie i 2 minuty przesuwane.</li>
-<li><strong>Źródło prawdy:</strong> PostgreSQL.</li>
-<li><strong>Awaria Redis:</strong> odczyt przechodzi do bazy, a zapis cache jest traktowany jako best effort.</li>
-<li><strong>Niecache'owane operacje:</strong> sprawdzanie magazynu, idempotencja i tworzenie zamówienia zawsze korzystają z bazy.</li>
-</ul>
-<p>Dla bardzo dużego ruchu listy zamówień można cache'ować osobno, ale każda zmiana statusu musi unieważniać powiązane klucze. Przy wielu usługach warto użyć zdarzeń integracyjnych do invalidacji zamiast lokalnego cache.</p>
-</section>
+1. Middleware uwierzytelnia JWT i odrzuca przekroczenie limitu requestów.
+2. Endpoint waliduje payload i nagłówek `Idempotency-Key`.
+3. Identyfikator klienta jest pobierany wyłącznie z podpisanego claimu `sub`.
+4. Serwis oblicza deterministyczny SHA-256 z klienta i znormalizowanej listy pozycji.
+5. Rozpoczynana jest transakcja PostgreSQL.
+6. Klucz idempotencji jest zapisywany przed właściwym zamówieniem.
+7. Dla każdej pozycji wykonywana jest atomowa aktualizacja stanu magazynowego.
+8. Ceny i nazwy produktów są kopiowane do pozycji zamówienia, dzięki czemu późniejsza zmiana katalogu nie modyfikuje historii.
+9. Zamówienie i identyfikator rezultatu idempotencji są zapisywane w tej samej transakcji.
+10. Po zatwierdzeniu odpowiedź jest zapisywana w Redis. Błąd Redis nie wycofuje zamówienia.
+11. Odpowiedź `201 Created` zawiera adres zasobu w nagłówku `Location`.
 
-<section class="vertical-stack-item">
-<h2>Logging i monitoring</h2>
-<ul>
-<li>Logi są emitowane jako JSON do standardowego wyjścia i mogą być zbierane przez platformę kontenerową.</li>
-<li>ASP.NET Core automatycznie tworzy aktywność dla requestu, a trace ID i span ID są dodawane do logów.</li>
-<li>Nie są logowane body requestów, tokeny JWT ani nagłówki autoryzacyjne.</li>
-<li>OpenTelemetry eksportuje trace'y i metryki przez OTLP.</li>
-<li>Liveness informuje, czy proces działa. Readiness sprawdza PostgreSQL i Redis.</li>
-</ul>
+### Cache
 
-<h3>Rekomendowane alerty</h3>
-<table>
-<thead>
-<tr>
-<th>Metryka</th>
-<th>Przykładowy alert</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Odsetek odpowiedzi 5xx</td>
-<td>Powyżej 1% przez 5 minut</td>
-</tr>
-<tr>
-<td>p95 czasu POST /api/orders</td>
-<td>Powyżej 500 ms przez 10 minut</td>
-</tr>
-<tr>
-<td>Wyczerpanie puli PostgreSQL</td>
-<td>Powyżej 80% przez 5 minut</td>
-</tr>
-<tr>
-<td>Błędy lub opóźnienie Redis</td>
-<td>Powyżej 100 ms albo seria timeoutów</td>
-</tr>
-<tr>
-<td>Konflikty magazynowe 409</td>
-<td>Nagły wzrost względem wartości bazowej</td>
-</tr>
-<tr>
-<td>Odrzucenia rate limitera</td>
-<td>Wzrost 429 dla jednego klienta lub adresu IP</td>
-</tr>
-<tr>
-<td>Readiness</td>
-<td>Brak gotowych replik przez więcej niż minutę</td>
-</tr>
-</tbody>
-</table>
-</section>
+- **Wzorzec:** cache-aside dla odczytu zamówienia.
+- **Klucz:** zawiera identyfikator klienta i zamówienia, co ogranicza ryzyko przecieku między klientami.
+- **TTL:** 10 minut absolutnie i 2 minuty przesuwane.
+- **Źródło prawdy:** PostgreSQL.
+- **Awaria Redis:** odczyt przechodzi do bazy, a zapis cache jest traktowany jako best effort.
+- **Niecache'owane operacje:** sprawdzanie magazynu, idempotencja i tworzenie zamówienia zawsze korzystają z bazy.
 
-<section class="vertical-stack-item">
-<h2>Zabezpieczenia produkcyjne</h2>
-<ul>
-<li>Cały ruch biznesowy powinien być obsługiwany wyłącznie przez HTTPS. TLS można zakończyć na zaufanym ingressie lub load balancerze.</li>
-<li>W produkcji zalecany jest zewnętrzny OIDC/OAuth 2.0 oraz podpis asymetryczny JWT. Symetryczny klucz w przykładzie służy lokalnemu uruchomieniu.</li>
-<li>Sekrety należy pobierać z Azure Key Vault, AWS Secrets Manager, Kubernetes Secrets lub równoważnego magazynu, a nie z repozytorium.</li>
-<li>Połączenia do PostgreSQL i Redis powinny używać TLS, prywatnej sieci oraz osobnych kont z minimalnymi uprawnieniami.</li>
-<li>Identyfikator klienta nie pochodzi z body, dzięki czemu klient nie może utworzyć zamówienia w imieniu innego użytkownika.</li>
-<li>Odczyt zamówienia filtruje jednocześnie po <code>OrderId</code> i <code>CustomerId</code>.</li>
-<li>Parametry EF Core zapobiegają SQL injection.</li>
-<li>Limit wielkości body, limit liczby pozycji i rate limiting ograniczają nadużycia zasobów.</li>
-<li>CORS jest domyślnie niedostępny. Jeśli API ma być wywoływane z przeglądarki, należy skonfigurować ścisłą listę dozwolonych originów.</li>
-<li>Przy tokenie przesyłanym w nagłówku Authorization i braku uwierzytelniania cookie klasyczny CSRF nie ma zastosowania.</li>
-<li>Należy skonfigurować zaufane proxy jawnie; nie wolno bezwarunkowo ufać nagłówkom <code>X-Forwarded-For</code> z Internetu.</li>
-<li>Retencja rekordów idempotencji powinna być realizowana zadaniem okresowym, na przykład po 24–72 godzinach, zgodnie z kontraktem API.</li>
-</ul>
-</section>
+Dla bardzo dużego ruchu listy zamówień można cache'ować osobno, ale każda zmiana statusu musi unieważniać powiązane klucze. Przy wielu usługach warto użyć zdarzeń integracyjnych do invalidacji zamiast lokalnego cache.
 
-<section class="vertical-stack-item">
-<h2>Najważniejsze decyzje i kompromisy</h2>
-<table>
-<thead>
-<tr>
-<th>Decyzja</th>
-<th>Zalety</th>
-<th>Wady</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>PostgreSQL jako źródło prawdy</td>
-<td>Transakcje ACID, ograniczenia, dojrzałe indeksy i dobra kontrola współbieżności.</td>
-<td>Skalowanie zapisów jest trudniejsze niż skalowanie stateless API; wymaga monitorowania puli i indeksów.</td>
-</tr>
-<tr>
-<td>Atomowa aktualizacja magazynu</td>
-<td>Brak oversellingu bez blokad aplikacyjnych i bez zależności od jednej instancji API.</td>
-<td>Przy bardzo gorących produktach powstaje kontencja na wierszu.</td>
-</tr>
-<tr>
-<td>Repeatable Read</td>
-<td>Spójny obraz cen i produktów podczas tworzenia zamówienia.</td>
-<td>Możliwe błędy serializacji i ponowienia zwiększające opóźnienie.</td>
-</tr>
-<tr>
-<td>Idempotencja w PostgreSQL</td>
-<td>Działa pomiędzy replikami i przeżywa restart procesu.</td>
-<td>Każdy zapis zamówienia wymaga dodatkowego rekordu oraz polityki retencji.</td>
-</tr>
-<tr>
-<td>Redis cache-aside</td>
-<td>Odciąża bazę przy częstych odczytach i nie jest źródłem prawdy.</td>
-<td>Możliwa chwilowa nieaktualność oraz dodatkowa infrastruktura.</td>
-</tr>
-<tr>
-<td>Minimal API</td>
-<td>Mały narzut, prosty routing i czytelny przykład pionowego wycinka.</td>
-<td>Przy bardzo dużej liczbie endpointów wymaga konsekwentnej organizacji modułów.</td>
-</tr>
-<tr>
-<td>EF Core DbContext Pool</td>
-<td>Mniejszy koszt alokacji kontekstu przy dużej liczbie requestów.</td>
-<td>Kontekst nie może przechowywać stanu zależnego od requestu poza standardowym trackingiem.</td>
-</tr>
-<tr>
-<td>Synchroniczne tworzenie zamówienia</td>
-<td>Klient natychmiast zna wynik rezerwacji magazynu.</td>
-<td>Dłuższa ścieżka requestu; przy bardzo złożonym procesie lepsze może być przyjęcie komendy i odpowiedź 202.</td>
-</tr>
-</tbody>
-</table>
-</section>
+### Logging i monitoring
 
-<section class="vertical-stack-item">
-<h2>Dalsze rozszerzenia produkcyjne</h2>
-<ul>
-<li><strong>Transactional outbox:</strong> zapis zdarzenia <code>OrderCreated</code> w tej samej transakcji i asynchroniczna publikacja do Kafka, RabbitMQ lub Azure Service Bus.</li>
-<li><strong>Płatności:</strong> osobny proces lub saga; nie należy utrzymywać transakcji bazodanowej podczas wywołania zewnętrznego operatora płatności.</li>
-<li><strong>Read replicas:</strong> odczyty historycznych zamówień mogą trafiać do replik, z uwzględnieniem opóźnienia replikacji.</li>
-<li><strong>Testy kontraktowe i integracyjne:</strong> PostgreSQL i Redis uruchamiane przez Testcontainers zamiast providerów in-memory.</li>
-<li><strong>Load testing:</strong> k6, NBomber lub Gatling z osobnymi scenariuszami dla unikalnych i powtarzanych kluczy idempotencji.</li>
-<li><strong>Autoscaling:</strong> na podstawie CPU, liczby aktywnych requestów i czasu odpowiedzi, przy zachowaniu limitów połączeń bazy.</li>
-<li><strong>Architektura modułowa:</strong> przy wzroście systemu moduły Orders, Catalog, Inventory i Payments mogą zostać rozdzielone, ale wymaga to komunikacji zdarzeniowej i obsługi eventual consistency.</li>
-</ul>
-<blockquote>
-<p>Najważniejszą zasadą jest niedopuszczenie, aby poprawność zamówienia zależała od pamięci pojedynczej instancji API albo od Redis. Krytyczne reguły współbieżności, idempotencji i stanu magazynowego są egzekwowane przez transakcyjne źródło prawdy.</p>
-</blockquote>
-</section>
-</div></div></div></article>
+- Logi są emitowane jako JSON do standardowego wyjścia i mogą być zbierane przez platformę kontenerową.
+- ASP.NET Core automatycznie tworzy aktywność dla requestu, a trace ID i span ID są dodawane do logów.
+- Nie są logowane body requestów, tokeny JWT ani nagłówki autoryzacyjne.
+- OpenTelemetry eksportuje trace'y i metryki przez OTLP.
+- Liveness informuje, czy proces działa. Readiness sprawdza PostgreSQL i Redis.
+
+#### Rekomendowane alerty
+
+| Metryka | Przykładowy alert |
+| --- | --- |
+| Odsetek odpowiedzi 5xx | Powyżej 1% przez 5 minut |
+| p95 czasu POST /api/orders | Powyżej 500 ms przez 10 minut |
+| Wyczerpanie puli PostgreSQL | Powyżej 80% przez 5 minut |
+| Błędy lub opóźnienie Redis | Powyżej 100 ms albo seria timeoutów |
+| Konflikty magazynowe 409 | Nagły wzrost względem wartości bazowej |
+| Odrzucenia rate limitera | Wzrost 429 dla jednego klienta lub adresu IP |
+| Readiness | Brak gotowych replik przez więcej niż minutę |
+
+### Zabezpieczenia produkcyjne
+
+- Cały ruch biznesowy powinien być obsługiwany wyłącznie przez HTTPS. TLS można zakończyć na zaufanym ingressie lub load balancerze.
+- W produkcji zalecany jest zewnętrzny OIDC/OAuth 2.0 oraz podpis asymetryczny JWT. Symetryczny klucz w przykładzie służy lokalnemu uruchomieniu.
+- Sekrety należy pobierać z Azure Key Vault, AWS Secrets Manager, Kubernetes Secrets lub równoważnego magazynu, a nie z repozytorium.
+- Połączenia do PostgreSQL i Redis powinny używać TLS, prywatnej sieci oraz osobnych kont z minimalnymi uprawnieniami.
+- Identyfikator klienta nie pochodzi z body, dzięki czemu klient nie może utworzyć zamówienia w imieniu innego użytkownika.
+- Odczyt zamówienia filtruje jednocześnie po `OrderId` i `CustomerId`.
+- Parametry EF Core zapobiegają SQL injection.
+- Limit wielkości body, limit liczby pozycji i rate limiting ograniczają nadużycia zasobów.
+- CORS jest domyślnie niedostępny. Jeśli API ma być wywoływane z przeglądarki, należy skonfigurować ścisłą listę dozwolonych originów.
+- Przy tokenie przesyłanym w nagłówku Authorization i braku uwierzytelniania cookie klasyczny CSRF nie ma zastosowania.
+- Należy skonfigurować zaufane proxy jawnie; nie wolno bezwarunkowo ufać nagłówkom `X-Forwarded-For` z Internetu.
+- Retencja rekordów idempotencji powinna być realizowana zadaniem okresowym, na przykład po 24–72 godzinach, zgodnie z kontraktem API.
+
+### Najważniejsze decyzje i kompromisy
+
+| Decyzja | Zalety | Wady |
+| --- | --- | --- |
+| PostgreSQL jako źródło prawdy | Transakcje ACID, ograniczenia, dojrzałe indeksy i dobra kontrola współbieżności. | Skalowanie zapisów jest trudniejsze niż skalowanie stateless API; wymaga monitorowania puli i indeksów. |
+| Atomowa aktualizacja magazynu | Brak oversellingu bez blokad aplikacyjnych i bez zależności od jednej instancji API. | Przy bardzo gorących produktach powstaje kontencja na wierszu. |
+| Repeatable Read | Spójny obraz cen i produktów podczas tworzenia zamówienia. | Możliwe błędy serializacji i ponowienia zwiększające opóźnienie. |
+| Idempotencja w PostgreSQL | Działa pomiędzy replikami i przeżywa restart procesu. | Każdy zapis zamówienia wymaga dodatkowego rekordu oraz polityki retencji. |
+| Redis cache-aside | Odciąża bazę przy częstych odczytach i nie jest źródłem prawdy. | Możliwa chwilowa nieaktualność oraz dodatkowa infrastruktura. |
+| Minimal API | Mały narzut, prosty routing i czytelny przykład pionowego wycinka. | Przy bardzo dużej liczbie endpointów wymaga konsekwentnej organizacji modułów. |
+| EF Core DbContext Pool | Mniejszy koszt alokacji kontekstu przy dużej liczbie requestów. | Kontekst nie może przechowywać stanu zależnego od requestu poza standardowym trackingiem. |
+| Synchroniczne tworzenie zamówienia | Klient natychmiast zna wynik rezerwacji magazynu. | Dłuższa ścieżka requestu; przy bardzo złożonym procesie lepsze może być przyjęcie komendy i odpowiedź 202. |
+
+### Dalsze rozszerzenia produkcyjne
+
+- **Transactional outbox:** zapis zdarzenia `OrderCreated` w tej samej transakcji i asynchroniczna publikacja do Kafka, RabbitMQ lub Azure Service Bus.
+- **Płatności:** osobny proces lub saga; nie należy utrzymywać transakcji bazodanowej podczas wywołania zewnętrznego operatora płatności.
+- **Read replicas:** odczyty historycznych zamówień mogą trafiać do replik, z uwzględnieniem opóźnienia replikacji.
+- **Testy kontraktowe i integracyjne:** PostgreSQL i Redis uruchamiane przez Testcontainers zamiast providerów in-memory.
+- **Load testing:** k6, NBomber lub Gatling z osobnymi scenariuszami dla unikalnych i powtarzanych kluczy idempotencji.
+- **Autoscaling:** na podstawie CPU, liczby aktywnych requestów i czasu odpowiedzi, przy zachowaniu limitów połączeń bazy.
+- **Architektura modułowa:** przy wzroście systemu moduły Orders, Catalog, Inventory i Payments mogą zostać rozdzielone, ale wymaga to komunikacji zdarzeniowej i obsługi eventual consistency.
+
+> Najważniejszą zasadą jest niedopuszczenie, aby poprawność zamówienia zależała od pamięci pojedynczej instancji API albo od Redis. Krytyczne reguły współbieżności, idempotencji i stanu magazynowego są egzekwowane przez transakcyjne źródło prawdy.
